@@ -1,0 +1,272 @@
+plugins {
+    id "dev.architectury.loom" version "1.11-SNAPSHOT" apply false
+    id "architectury-plugin" version "3.4-SNAPSHOT"
+    id "com.gradleup.shadow" version "8.3.6" apply false
+}
+
+architectury {
+    minecraft = project.minecraft_version
+}
+
+allprojects {
+    group = rootProject.maven_group
+    version = rootProject.mod_version
+}
+
+subprojects {
+    apply plugin: "dev.architectury.loom"
+    apply plugin: "architectury-plugin"
+    apply plugin: "maven-publish"
+
+    base {
+        def mcVer = (rootProject.findProperty("minecraft_version") ?: rootProject.minecraft_version)
+        archivesName = "${rootProject.archives_name}-${project.name}-${rootProject.mod_version}_${mcVer}"
+    }
+
+    tasks.withType(Jar).configureEach { archiveVersion = "" }
+
+    tasks.named("remapJar", RemapJarTask).configure {
+        input.set(tasks.named("jar").flatMap { it.archiveFile })
+        archiveVersion = ""
+    }
+
+    repositories {
+        maven { url "https://maven.fabricmc.net/" }
+        maven { url "https://maven.architectury.dev/" }
+        maven { url "https://maven.neoforged.net/releases" }
+        mavenCentral()
+    }
+
+    loom {
+        silentMojangMappingsLicense()
+    }
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+    tasks.withType(JavaCompile).configureEach { options.release = 21 }
+
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                artifactId = base.archivesName.get()
+                from components.java
+            }
+        }
+        repositories { /* leer gelassen */ }
+    }
+
+    if (project.name == "neoforge") {
+        tasks.named("processResources") {
+            def mcFull = (rootProject.findProperty("minecraft_version") ?: rootProject.minecraft_version).toString()
+            def parts = mcFull.tokenize('.')
+            if (parts.size() < 2) throw new GradleException("Invalid minecraft_version: ${mcFull}")
+            def major = parts[0] as int
+            def minor = parts[1] as int
+            def mcLo = "${major}.${minor}"
+            def mcHi = "${major}.${minor + 1}"
+
+            def nfLo = (rootProject.findProperty("neoforge_line_lo") ?: "21.0").toString()
+            def nfHi = (rootProject.findProperty("neoforge_line_hi") ?: "22.0").toString()
+
+            def archVer = (rootProject.findProperty("architectury_version_plain")
+                    ?: project.findProperty("architectury_version_plain")
+                    ?: "13.0.0").toString()
+
+            inputs.property "mcLo", mcLo
+            inputs.property "mcHi", mcHi
+            inputs.property "nfLo", nfLo
+            inputs.property "nfHi", nfHi
+            inputs.property "archVer", archVer
+
+            filesMatching("META-INF/neoforge.mods.toml") {
+                expand([
+                        mcLo    : mcLo,
+                        mcHi    : mcHi,
+                        nfLo    : nfLo,
+                        nfHi    : nfHi,
+                        archVer : archVer,
+                        version : project.version
+                ])
+                filteringCharset = 'UTF-8'
+            }
+        }
+    }
+}
+
+// ---- TARGET RESOLVER
+ext.resolveMcTarget = { String mcStr ->
+    def t = ext.mcTargets.find { it.mc == mcStr }
+    if (!t) throw new GradleException("No mcTarget for minecraft_version='$mcStr'")
+    return t
+}
+
+// ---- BUILD TARGETS
+ext.mcTargets = [
+        [ mc: "1.21",   fabricApi: "0.102.0+1.21",   architecturyVer: "13.0.8", neoforge: "21.0.167",    neoforgeLineLo: "21.0", neoforgeLineHi: "21.1", yarnBuild: "build.1" ],
+        [ mc: "1.21.1", fabricApi: "0.116.5+1.21.1", architecturyVer: "13.0.8", neoforge: "21.1.200",    neoforgeLineLo: "21.1", neoforgeLineHi: "21.2", yarnBuild: "build.1" ],
+        [ mc: "1.21.2", fabricApi: "0.106.1+1.21.2", architecturyVer: "14.0.4", neoforge: "21.2.1-beta", neoforgeLineLo: "21.2", neoforgeLineHi: "21.3", yarnBuild: "build.1" ],
+        [ mc: "1.21.3", fabricApi: "0.114.1+1.21.3", architecturyVer: "14.0.4", neoforge: "21.3.89",     neoforgeLineLo: "21.3", neoforgeLineHi: "21.4", yarnBuild: "build.1" ],
+        [ mc: "1.21.4", fabricApi: "0.119.4+1.21.4", architecturyVer: "15.0.3", neoforge: "21.4.150",    neoforgeLineLo: "21.4", neoforgeLineHi: "21.5", yarnBuild: "build.1" ],
+        [ mc: "1.21.5", fabricApi: "0.128.2+1.21.5", architecturyVer: "16.1.4", neoforge: "21.5.91",     neoforgeLineLo: "21.5", neoforgeLineHi: "21.6", yarnBuild: "build.1" ],
+        [ mc: "1.21.6", fabricApi: "0.128.2+1.21.6", architecturyVer: "17.0.6", neoforge: "21.6.20-beta",neoforgeLineLo: "21.6", neoforgeLineHi: "21.7", yarnBuild: "build.1" ],
+        [ mc: "1.21.7", fabricApi: "0.129.0+1.21.7", architecturyVer: "17.0.8", neoforge: "21.7.25-beta",neoforgeLineLo: "21.7", neoforgeLineHi: "21.8", yarnBuild: "build.1" ],
+        [ mc: "1.21.8", fabricApi: "0.131.0+1.21.8", architecturyVer: "17.0.8", neoforge: "21.8.31",     neoforgeLineLo: "21.8", neoforgeLineHi: "21.9", yarnBuild: "build.1" ],
+        [ mc: "1.21.9", fabricApi: "0.134.0+1.21.9", architecturyVer: "18.0.3", neoforge: "21.9.16-beta", neoforgeLineLo: "21.9", neoforgeLineHi: "21.10", yarnBuild: "build.1" ],
+        [ mc: "1.21.10", fabricApi: "0.135.0+1.21.10", architecturyVer: "18.0.3", neoforge: "21.10.38-beta", neoforgeLineLo: "21.10", neoforgeLineHi: "21.11", yarnBuild: "build.1" ],
+]
+
+// ---- Build per version via external gradlew
+import net.fabricmc.loom.task.RemapJarTask
+import org.gradle.internal.os.OperatingSystem
+def gradleWrapper = OperatingSystem.current().isWindows() ? "gradlew.bat" : "./gradlew"
+
+ext.mcTargets.each { t ->
+    // Fabric only
+    def buildFabricTask = tasks.register("buildFabric_${t.mc}", Exec) {
+        group = "build/fabric"
+        description = "Build Fabric for MC ${t.mc}"
+        workingDir rootProject.projectDir
+        commandLine gradleWrapper,
+                "--no-daemon",
+                "-Pfilter_platforms=fabric",
+                "-Pminecraft_version=${t.mc}",
+                "-Pfabric_api_version=${t.fabricApi}",
+                "-Parchitectury_version_plain=${t.architecturyVer}",
+                "-Pyarn_build=${t.yarnBuild ?: 'build.1'}",
+                ":fabric:clean", ":fabric:build"
+    }
+
+    tasks.register("copyFabricJars_${t.mc}") {
+        dependsOn buildFabricTask
+        doLast {
+            def libsDir = file("${rootProject.projectDir}/fabric/build/libs")
+            if (!libsDir.exists()) {
+                throw new GradleException("Libs dir not found: ${libsDir}")
+            }
+
+            def builtJars = libsDir.listFiles().findAll { File f ->
+                f.name.endsWith(".jar") &&
+                        !f.name.endsWith("-sources.jar") &&
+                        !f.name.contains("dev-shadow")
+            }
+            if (builtJars.isEmpty()) {
+                throw new GradleException("No built jars found in ${libsDir}")
+            }
+
+            def buildOut = file("${rootProject.projectDir}/build/fabric/${t.mc}")
+            copy {
+                from builtJars
+                into buildOut
+            }
+
+            def localModsDir = file("${rootProject.projectDir}/local_servers/fabric/${t.mc}/mods")
+            if (!localModsDir.exists()) {
+                println "local_servers/fabric/${t.mc}/mods not found – skipped local deploy."
+                return
+            }
+
+            localModsDir.listFiles()?.findAll { File f ->
+                f.name.endsWith(".jar") &&
+                        f.name.toLowerCase().contains(rootProject.archives_name.toString().toLowerCase())
+            }?.each { it.delete() }
+
+            copy {
+                from builtJars
+                into localModsDir
+            }
+
+            println "Deployed Fabric ${t.mc} jar to ${localModsDir}"
+        }
+    }
+
+    tasks.register("runLocalFabric_${t.mc}", Exec) {
+        group = "run/fabric"
+        description = "Build, deploy and run local Fabric server for MC ${t.mc}"
+        dependsOn "copyFabricJars_${t.mc}"
+
+        workingDir "$rootProject.projectDir/local_servers/fabric/${t.mc}"
+        commandLine "java", "-Xmx4G", "-jar", "server.jar", "nogui"
+    }
+
+    // NeoForge only
+    def buildNeoForgeTask = tasks.register("buildNeoForge_${t.mc}", Exec) {
+        group = "build/neoforge"
+        description = "Build NeoForge for MC ${t.mc}"
+        workingDir rootProject.projectDir
+        commandLine gradleWrapper,
+                "--no-daemon",
+                "-Pfilter_platforms=neoforge",
+                "-Pminecraft_version=${t.mc}",
+                "-Pneoforge_version=${t.neoforge}",
+                "-Parchitectury_version_plain=${t.architecturyVer}",
+                "-Pneoforge_line_lo=${t.neoforgeLineLo}",
+                "-Pneoforge_line_hi=${t.neoforgeLineHi}",
+                ":neoforge:clean", ":neoforge:build"
+    }
+
+    tasks.register("copyNeoForgeJars_${t.mc}") {
+        dependsOn buildNeoForgeTask
+        doLast {
+            def nfLibsDir = file("${rootProject.projectDir}/neoforge/build/libs")
+            if (!nfLibsDir.exists()) {
+                throw new GradleException("NeoForge libs dir not found: ${nfLibsDir}")
+            }
+
+            def nfJars = nfLibsDir.listFiles().findAll { File f ->
+                f.name.endsWith(".jar") &&
+                        !f.name.endsWith("-sources.jar") &&
+                        !f.name.contains("dev-shadow")
+            }
+            if (nfJars.isEmpty()) {
+                throw new GradleException("No NeoForge jars found in ${nfLibsDir}")
+            }
+
+            def nfOut = file("${rootProject.projectDir}/build/neoforge/${t.mc}")
+            copy {
+                from nfJars
+                into nfOut
+            }
+
+            def localModsDir = file("${rootProject.projectDir}/local_servers/neoforge/${t.mc}/mods")
+            if (!localModsDir.exists()) {
+                println "local_servers/neoforge/${t.mc}/mods not found – skipped local deploy."
+                return
+            }
+
+            localModsDir.listFiles()?.findAll { File f ->
+                f.name.endsWith(".jar") &&
+                        f.name.toLowerCase().contains(rootProject.archives_name.toString().toLowerCase())
+            }?.each { it.delete() }
+
+            copy {
+                from nfJars
+                into localModsDir
+            }
+
+            println "Deployed NeoForge ${t.mc} jar to ${localModsDir}"
+        }
+    }
+
+    tasks.register("runLocalNeoForge_${t.mc}", Exec) {
+        group = "run/neoforge"
+        description = "Build, deploy and run local NeoForge server for MC ${t.mc}"
+        dependsOn "copyNeoForgeJars_${t.mc}"
+
+        workingDir "$rootProject.projectDir/local_servers/neoforge/${t.mc}"
+
+        if (OperatingSystem.current().isWindows()) {
+            commandLine "cmd", "/c", "run.bat"
+        } else {
+            commandLine "bash", "run.sh"
+        }
+    }
+}
+
+// Convenience task: build everything
+tasks.register("buildAll") {
+    group = "build"
+    description = "Build all Fabric & NeoForge targets"
+    dependsOn tasks.matching { it.name.startsWith("copyFabricJars_") || it.name.startsWith("copyNeoForgeJars_") }
+}
