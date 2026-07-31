@@ -1,0 +1,51 @@
+//def mcVersion = project.property("minecraft_version") // e.g., "1.21.7"
+//def versionsDir = file("${project.rootDir}/versions")
+//
+//def matchingFolders = versionsDir.listFiles()?.findAll { dir ->
+//    dir.isDirectory() && VersionUtil.versionMatches(dir.name, mcVersion)
+//} ?: []
+//
+//if (matchingFolders.isEmpty()) {
+//    throw new GradleException("No matching version folder found for ${mcVersion}")
+//}
+//
+//def selectedVersionDir = matchingFolders[0] // pick the first match
+//println "[Neoforge] Building for ${minecraft_version} using folder ${selectedVersionDir.name}"
+//ext.version_number = selectedVersionDir.name
+//
+//sourceSets.main {
+//    java.srcDirs += ["${selectedVersionDir}/neoforge/java"]
+//    resources.srcDirs += ["${selectedVersionDir}/neoforge/resources"]
+//}
+
+def mcVersion = project.property("minecraft_version") // e.g., "1.21.4"
+def versionsDir = file("${project.rootDir}/versions")
+
+// 1. Find all matching directories
+def matchingFolders = versionsDir.listFiles()?.findAll { dir ->
+    dir.isDirectory() && VersionUtil.versionMatches(dir.name, mcVersion)
+} ?: []
+
+if (matchingFolders.isEmpty()) {
+    throw new GradleException("No matching version folder found for ${mcVersion}")
+}
+
+// 2. Sort folders so broader ranges come first, followed by more specific ones
+// This ensures specific version files override common/range files in source set precedence
+matchingFolders.sort { a, b -> a.name.length() <=> b.name.length() }
+
+println "[NeoForge] Building for ${mcVersion} using folders: ${matchingFolders*.name.join(', ')}"
+
+// Set to the most specific matching version directory
+ext.version_number = matchingFolders.last().name
+
+// 3. Append all matching NeoForge source and resource directories
+sourceSets.main {
+    matchingFolders.each { dir ->
+        def javaDir = file("${dir}/neoforge/java")
+        def resourcesDir = file("${dir}/neoforge/resources")
+
+        if (javaDir.exists()) java.srcDirs += javaDir
+        if (resourcesDir.exists()) resources.srcDirs += resourcesDir
+    }
+}

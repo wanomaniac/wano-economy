@@ -1,32 +1,57 @@
 pluginManagement {
     repositories {
-        maven { url "https://maven.fabricmc.net/" }
-        maven { url "https://maven.architectury.dev/" }
-        maven { url "https://maven.neoforged.net/" }
         gradlePluginPortal()
         mavenCentral()
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = 'Fabric'
+                    url = uri('https://maven.fabricmc.net')
+                }
+            }
+            filter {
+                includeGroup('net.fabricmc')
+                includeGroup('net.fabricmc.unpick')
+                includeGroup('fabric-loom')
+            }
+        }
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = 'Sponge'
+                    url = uri('https://repo.spongepowered.org/repository/maven-public')
+                }
+            }
+            filter {
+                includeGroupAndSubgroups("org.spongepowered")
+            }
+        }
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = 'Forge'
+                    url = uri('https://maven.minecraftforge.net')
+                }
+            }
+            filter {
+                includeGroupAndSubgroups('net.minecraftforge')
+            }
+        }
     }
 }
 
-rootProject.name = "economycraft"
 
-def raw = gradle.startParameter.projectProperties.get("filter_platforms")
-if (raw == null || raw.trim().isEmpty()) {
-    raw = System.getProperty("filter_platforms", "fabric,neoforge")
-}
-def enabled = raw.split(",").collect { it.trim() }.findAll { it }
-println "[settings.gradle] filter_platforms = ${enabled}"
+// This should match the folder name of the project, or else IDEA may complain (see https://youtrack.jetbrains.com/issue/IDEA-317606)
+rootProject.name = 'wano-economy'
+include('common')
+def enabledLoaders = providers.gradleProperty('using_loaders')
+        .orElse('')
+        .get()
+        .split(',')*.trim()
 
-include("common")
-if (enabled.contains("fabric")) {
-    println "[settings.gradle] including fabric"
-    include("fabric")
-} else {
-    println "[settings.gradle] skipping fabric"
-}
-if (enabled.contains("neoforge")) {
-    println "[settings.gradle] including neoforge"
-    include("neoforge")
-} else {
-    println "[settings.gradle] skipping neoforge"
+// 3. Dynamically include configured subprojects
+enabledLoaders.each { loader ->
+    if (!loader.isEmpty()) {
+        include(loader)
+    }
 }

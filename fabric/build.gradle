@@ -1,59 +1,229 @@
+//buildscript {
+//    dependencies {
+//            classpath "fabric-loom:fabric-loom.gradle.plugin:1.14-SNAPSHOT"
+//    }
+//}
+
 plugins {
-    id "com.gradleup.shadow"
+    id 'multiloader-loader'
+    id "com.modrinth.minotaur" version "2.+"
+    id "fabric-loom" version "1.13-SNAPSHOT"
 }
 
-architectury {
-    platformSetupLoomIde()
-    fabric()
+if (parchment_version == null && !VersionUtil.isVersionDeobfuscated(minecraft_version)) {
+    project.tasks.configureEach { enabled = false }
+    println "Skipping Fabric project as dependency isn't supported"
+    return
 }
 
-configurations {
-    common { canBeResolved = true; canBeConsumed = false }
-    compileClasspath.extendsFrom common
-    runtimeClasspath.extendsFrom common
-    developmentFabric.extendsFrom common
-    shadowBundle { canBeResolved = true; canBeConsumed = false }
-}
+ext.minecraft_version_range = VersionUtil.formatVersionRange(VersionUtil.getEffectiveVersionRangeArray(project.rootDir.toString(),  project.minecraft_version.toString(), "fabric"))
+println("Supported Minecraft Versions for Fabric: $ext.minecraft_version_range")
 
-repositories {
-    maven { url "https://maven.fabricmc.net/" }
-    maven { url "https://maven.architectury.dev/" }
-    mavenCentral()
-}
 
-def mcCoord = (rootProject.findProperty("minecraft_version") ?: rootProject.minecraft_version) as String
-def tgt     = rootProject.ext.resolveMcTarget(mcCoord)
-def yarnB   = (rootProject.findProperty("yarn_build") ?: tgt.yarnBuild) as String
 
 dependencies {
-    minecraft "com.mojang:minecraft:${mcCoord}"
-    mappings loom.officialMojangMappings()
-
-    // Platform loader + API
-    modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${rootProject.findProperty('fabric_api_version') ?: tgt.fabricApi}"
-    modApi "dev.architectury:architectury-fabric:${rootProject.findProperty('architectury_version_plain') ?: tgt.architecturyVer}"
-
-    // Link common module
-    common(project(path: ":common", configuration: "namedElements")) { transitive = false }
-    shadowBundle project(path: ":common", configuration: "transformProductionFabric")
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    mappings loom.layered {
+        officialMojangMappings()
+        if(!VersionUtil.isVersionDeobfuscated(minecraft_version)) {
+            parchment("org.parchmentmc.data:parchment-${parchment_minecraft}:${parchment_version}@zip")
+        }
+    }
+    modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
 }
 
-processResources {
-    inputs.property("version", project.version)
-    inputs.property("mcVer", mcCoord)
-    inputs.property("archVer", tgt.architecturyVer)
 
-    filesMatching("fabric.mod.json") {
-        expand version: project.version, mcVer: mcCoord, archVer: tgt.architecturyVer
+base {
+    archivesName = "${mod_id}-fabric${VersionUtil.createVersionRange(VersionUtil.getEffectiveVersionRangeArray(project.rootDir.toString(), project.minecraft_version, "fabric"))}"
+}
+
+apply from: file("${project.rootDir}/versions/_builds/fabric.gradle")
+
+loom {
+    mixin {
+        defaultRefmapName = "servermodmenu.refmap.json"
+    }
+    def aw = project(':common').file("src/main/resources/${mod_id}.accesswidener")
+    if (aw.exists()) {
+        accessWidenerPath.set(aw)
+    }
+    runs {
+        client {
+            client()
+            setConfigName('Fabric Client')
+            ideConfigGenerated(true)
+            runDir('runs/client')
+        }
+        server {
+            server()
+            setConfigName('Fabric Server')
+            ideConfigGenerated(true)
+            runDir('runs/server')
+        }
     }
 }
 
-shadowJar {
-    configurations = [project.configurations.shadowBundle]
-    archiveClassifier = "dev-shadow"
+// Implement mcgradleconventions loader attribute
+def loaderAttribute = Attribute.of('io.github.mcgradleconventions.loader', String)
+['apiElements', 'runtimeElements', 'sourcesElements', 'javadocElements', 'includeInternal', 'modCompileClasspath'].each { variant ->
+    configurations.named("$variant") {
+        attributes {
+            attribute(loaderAttribute, 'fabric')
+        }
+    }
 }
 
-remapJar {
-    inputFile.set(shadowJar.archiveFile)
+
+sourceSets.configureEach {
+    [it.compileClasspathConfigurationName, it.runtimeClasspathConfigurationName].each { variant->
+        configurations.named("$variant") {
+            attributes {
+                attribute(loaderAttribute, 'fabric')
+            }
+        }
+    }
+}
+loom.remapConfigurations.configureEach {
+    configurations.named(it.name) {
+        attributes {
+            attribute(loaderAttribute, 'fabric')
+        }
+    }
+}
+
+tasks.withType(Javadoc).configureEach {
+    enabled = false
+}
+
+tasks.named('processResources') {
+    dependsOn(':common:mergeSources')
+}
+
+tasks.named('sourcesJar') {
+    dependsOn(':common:mergeSources')
+}
+
+import org.gradle.tooling.GradleConnector
+
+tasks.register('buildAll') {
+    group = 'build'
+    description = 'Builds Fabric project across the primary version of every version range folder.'
+
+    doLast {
+        def baseVersionsDir = file("${project.rootDir}/versions")
+        if (!baseVersionsDir.exists() || !baseVersionsDir.isDirectory()) {
+            throw new GradleException("Versions directory missing at ${baseVersionsDir.absolutePath}")
+        }
+
+        // 1. Scan the versions directory for all rule folders
+        def ruleFolders = baseVersionsDir.listFiles()?.findAll { dir ->
+            dir.isDirectory() && !dir.name.startsWith('.') && !dir.name.startsWith("_")
+            && (new File(dir, 'fabric').isDirectory() || new File(dir, 'common').isDirectory())
+        } ?: []
+
+        // 2. Resolve the first Minecraft version for each range folder
+        Set<String> targetVersions = [] as Set
+        ruleFolders.each { folder ->
+            // Pass folder name or extract the range to get mapped versions
+            def versions = VersionUtil.getVersionsFromDirectory(project.rootDir.toString(), folder)
+            if (versions && versions.length > 0) {
+                // Pick the first version in the sorted/resolved range
+                targetVersions << versions[0].replaceAll(/(\.0)$/, '')
+            }
+        }
+
+        println "Found target primary versions to build: ${targetVersions}"
+
+        targetVersions.each { mcVer ->
+            println "\n=========================================="
+            println "  Building Fabric for Minecraft: ${mcVer}"
+            println "==========================================\n"
+
+            def connectionObj = GradleConnector.newConnector().forProjectDirectory(project.rootDir);
+            if(System.getenv("GRADLE_DIRECTORY") != null){ // i dualboot linux and windows, linux has less space so i use windows partition for gradle.
+                connectionObj.useGradleUserHomeDir(System.getenv("GRADLE_DIRECTORY") as File)
+            }
+            def connection = connectionObj.connect();
+            try {
+                connection.newBuild()
+                        .forTasks(':fabric:build')
+                        .setEnvironmentVariables([MINECRAFT_VERSION: mcVer] as Map<String, String>)
+                        .setStandardOutput(System.out)
+                        .setStandardError(System.err)
+                        .run()
+            } finally {
+                connection.close()
+            }
+        }
+    }
+}
+
+tasks.register('publishAll') {
+    group = 'publishing'
+    description = 'Publishes the Fabric project across the primary version of every version range folder.'
+
+    doLast {
+        def baseVersionsDir = file("${project.rootDir}/versions")
+        if (!baseVersionsDir.exists() || !baseVersionsDir.isDirectory()) {
+            throw new GradleException("Versions directory missing at ${baseVersionsDir.absolutePath}")
+        }
+
+        // 1. Scan the versions directory for all rule folders
+        def ruleFolders = baseVersionsDir.listFiles()?.findAll { dir ->
+            dir.isDirectory() && !dir.name.startsWith('.') && !dir.name.startsWith("_")
+                    && (new File(dir, 'fabric').isDirectory() || new File(dir, 'common').isDirectory())
+        } ?: []
+
+        // 2. Resolve the first Minecraft version for each range folder
+        Set<String> targetVersions = [] as Set
+        ruleFolders.each { folder ->
+            // Pass folder name or extract the range to get mapped versions
+            def versions = VersionUtil.getVersionsFromDirectory(project.rootDir.toString(), folder)
+            if (versions && versions.length > 0) {
+                // Pick the first version in the sorted/resolved range
+                targetVersions << versions[0].replaceAll(/(\.0)$/, '')
+            }
+        }
+
+        println "Found target primary versions to build: ${targetVersions}"
+
+        targetVersions.each { mcVer ->
+            println "\n=========================================="
+            println "  Publishing Fabric for Minecraft: ${mcVer}"
+            println "==========================================\n"
+
+            def connectionObj = GradleConnector.newConnector().forProjectDirectory(project.rootDir);
+            if(System.getenv("GRADLE_DIRECTORY") != null){ // i dualboot linux and windows, linux has less space so i use windows partition for gradle.
+                connectionObj.useGradleUserHomeDir(System.getenv("GRADLE_DIRECTORY") as File)
+            }
+            def connection = connectionObj.connect();
+            try {
+                connection.newBuild()
+                        .forTasks(':fabric:modrinth')
+                        .setEnvironmentVariables([MINECRAFT_VERSION: mcVer, MODRINTH_TOKEN: System.getenv("MODRINTH_TOKEN")] as Map<String, String>)
+                        .setStandardOutput(System.out)
+                        .setStandardError(System.err)
+                        .run()
+            } finally {
+                connection.close()
+            }
+        }
+    }
+}
+
+// idk why modrinth STILL hasnt implemented clientSide and serverSide options?
+modrinth {
+    token       = project.modrinthTOKEN
+    projectId   = project.modrinthID     // numeric ID or slug
+    versionNumber = project.version.toString()     // or manually set
+    versionName   = project.mod_name.toString()+" "+project.version.toString()     // optional
+    changelog     = file(rootDir.toString()+"/CHANGELOG.md").text       // or a string
+    loaders       = ["fabric"]
+    gameVersions  = VersionUtil.getEffectiveVersionRangeArray(project.rootDir.toString(),  project.minecraft_version.toString(), "fabric").toList()
+    uploadFile    = tasks.named("remapJar")
+    additionalFiles = [
+            tasks.named("sourcesJar"),
+            tasks.named("javadocJar")
+    ]
 }

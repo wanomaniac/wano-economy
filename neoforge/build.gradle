@@ -1,100 +1,222 @@
+import org.gradle.tooling.GradleConnector
+
+buildscript {
+    dependencies {
+        classpath("com.modrinth.minotaur:com.modrinth.minotaur.gradle.plugin:2.8.10")
+    }
+}
+
 plugins {
-    id "com.gradleup.shadow"
+    id 'multiloader-loader'
+    id 'net.neoforged.moddev' version '2.+'
 }
 
-architectury {
-    platformSetupLoomIde()
-    neoForge()
+
+ext.minecraft_version_range = VersionUtil.formatVersionRange(VersionUtil.getEffectiveVersionRangeArray(project.rootDir.toString(),  project.minecraft_version.toString(), "neoforge"))
+println("Supported Minecraft Versions for NeoForge: $ext.minecraft_version_range")
+
+base {
+    archivesName = "${mod_id}-neoforge${VersionUtil.createVersionRange(VersionUtil.getEffectiveVersionRangeArray(project.rootDir.toString(), project.minecraft_version, "neoforge"))}"
 }
 
-configurations {
-    common { canBeResolved = true; canBeConsumed = false }
-    compileClasspath.extendsFrom common
-    runtimeClasspath.extendsFrom common
-    developmentNeoForge.extendsFrom common
-    shadowBundle { canBeResolved = true; canBeConsumed = false }
+if (neoforge_version == null) {
+    project.tasks.configureEach { enabled = false }
+    println "Skipping NeoForge project as version isn't supported"
+    return
 }
 
-repositories {
-    maven { url "https://maven.neoforged.net/releases" }
-    maven { url "https://maven.architectury.dev/" }
-    mavenCentral()
+
+apply from: file("${project.rootDir}/versions/_builds/neoforge.gradle")
+
+
+neoForge {
+    version = neoforge_version
+    // Automatically enable neoforge AccessTransformers if the file exists
+    def at = project(':common').file('src/main/resources/META-INF/accesstransformer.cfg')
+    if (at.exists()) {
+        accessTransformers.from(at.absolutePath)
+    }
+    if(!VersionUtil.isVersionDeobfuscated(minecraft_version)) {
+        parchment {
+            minecraftVersion = parchment_minecraft
+            mappingsVersion = parchment_version
+        }
+    }
+    runs {
+        configureEach {
+            systemProperty('neoforge.enabledGameTestNamespaces', mod_id)
+            ideName = "NeoForge ${it.name.capitalize()} (${project.path})" // Unify the run config names with fabric
+        }
+        client {
+            client()
+        }
+        server {
+            server()
+        }
+    }
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+
+
 }
 
-def mcCoord = (rootProject.findProperty("minecraft_version") ?: rootProject.minecraft_version) as String
-def tgt     = rootProject.ext.resolveMcTarget(mcCoord)
+sourceSets.main.resources { srcDir 'src/generated/resources' }
 
-dependencies {
-    // Required for Loom
-    minecraft "com.mojang:minecraft:${mcCoord}"
-    mappings loom.officialMojangMappings()
-
-    // Platform loader + API
-    neoForge "net.neoforged:neoforge:${rootProject.findProperty('neoforge_version') ?: tgt.neoforge}"
-    modApi "dev.architectury:architectury-neoforge:${rootProject.findProperty('architectury_version_plain') ?: tgt.architecturyVer}"
-
-    // Link common module
-    common(project(path: ":common", configuration: "namedElements")) { transitive = false }
-    shadowBundle project(path: ":common", configuration: "transformProductionNeoForge")
-}
-
-processResources {
-    def mcFull = mcCoord.toString()
-    def parts = mcFull.tokenize('.')
-    if (parts.size() < 2) throw new GradleException("Invalid minecraft_version: ${mcFull}")
-    def major = parts[0] as int
-    def minor = parts[1] as int
-    def mcLo = "${major}.${minor}"
-    def mcHi = "${major}.${minor + 1}"
-
-    def nfLo = (rootProject.findProperty("neoforge_line_lo") ?: "21.0").toString()
-    def nfHi = (rootProject.findProperty("neoforge_line_hi") ?: "22.0").toString()
-
-    def archVer = (rootProject.findProperty("architectury_version_plain")
-            ?: project.findProperty("architectury_version_plain")
-            ?: "13.0.0").toString()
-
-    inputs.property "version", project.version
-    inputs.property "mcLo", mcLo
-    inputs.property "mcHi", mcHi
-    inputs.property "nfLo", nfLo
-    inputs.property "nfHi", nfHi
-    inputs.property "archVer", archVer
-
-    filesMatching("META-INF/neoforge.mods.toml") {
-        expand([
-                version : project.version,
-                mcLo    : mcLo,
-                mcHi    : mcHi,
-                nfLo    : nfLo,
-                nfHi    : nfHi,
-                archVer : archVer
-        ])
-        filteringCharset = 'UTF-8'
+// Implement mcgradleconventions loader attribute
+def loaderAttribute = Attribute.of('io.github.mcgradleconventions.loader', String)
+['apiElements', 'runtimeElements', 'sourcesElements', 'javadocElements'].each { variant ->
+    configurations.named("$variant") {
+        attributes {
+            attribute(loaderAttribute, 'neoforge')
+        }
     }
 }
 
-tasks.withType(Jar).configureEach {
-    manifest {
-        attributes(
-                'Implementation-Title': project.name,
-                'Implementation-Version': project.version
-        )
+
+
+sourceSets.configureEach {
+    [it.compileClasspathConfigurationName, it.runtimeClasspathConfigurationName, it.getTaskName(null, 'jarJar')].each { variant->
+        configurations.named("$variant") {
+            attributes {
+                attribute(loaderAttribute, 'neoforge')
+            }
+        }
     }
 }
 
-shadowJar {
-    configurations = [project.configurations.shadowBundle]
-    archiveClassifier = "dev-shadow"
+tasks.withType(Javadoc).configureEach {
+    enabled = false
+}
 
-    manifest {
-        attributes(
-                'Implementation-Title': project.name,
-                'Implementation-Version': project.version
-        )
+tasks.named('processResources') {
+    dependsOn(':common:mergeSources')
+}
+
+tasks.named('sourcesJar') {
+    dependsOn(':common:mergeSources')
+}
+
+tasks.register('buildAll') {
+    group = 'build'
+    description = 'Builds the NeoForge project across the primary version of every version range folder.'
+
+    doLast {
+        def baseVersionsDir = file("${project.rootDir}/versions")
+        if (!baseVersionsDir.exists() || !baseVersionsDir.isDirectory()) {
+            throw new GradleException("Versions directory missing at ${baseVersionsDir.absolutePath}")
+        }
+
+        // 1. Scan the versions directory for all rule folders
+        def ruleFolders = baseVersionsDir.listFiles()?.findAll { dir ->
+            dir.isDirectory() && !dir.name.startsWith('.') && !dir.name.startsWith("_")
+                    && (new File(dir, 'neoforge').isDirectory() || new File(dir, 'common').isDirectory())
+        } ?: []
+
+        // 2. Resolve the first Minecraft version for each range folder
+        Set<String> targetVersions = [] as Set
+        ruleFolders.each { folder ->
+            // Pass folder name or extract the range to get mapped versions
+            def versions = VersionUtil.getVersionsFromDirectory(project.rootDir.toString(), folder)
+            if (versions && versions.length > 0) {
+                // Pick the first version in the sorted/resolved range
+                targetVersions << versions[0].replaceAll(/(\.0)$/, '')
+            }
+        }
+
+        println "Found target primary versions to build: ${targetVersions}"
+
+        targetVersions.each { mcVer ->
+            println "\n=========================================="
+            println "  Building NeoForge for Minecraft: ${mcVer}"
+            println "==========================================\n"
+
+            def connectionObj = GradleConnector.newConnector().forProjectDirectory(project.rootDir);
+            if(System.getenv("GRADLE_DIRECTORY") != null){ // i dualboot linux and windows, linux has less space so i use windows partition for gradle.
+                connectionObj.useGradleUserHomeDir(System.getenv("GRADLE_DIRECTORY") as File)
+            }
+            def connection = connectionObj.connect();
+            try {
+                connection.newBuild()
+                        .forTasks(':neoforge:build')
+                        .setEnvironmentVariables([MINECRAFT_VERSION: mcVer] as Map<String, String>)
+                        .setStandardOutput(System.out)
+                        .setStandardError(System.err)
+                        .run()
+            } finally {
+                connection.close()
+            }
+        }
     }
 }
 
-remapJar {
-    inputFile.set(shadowJar.archiveFile)
+tasks.register('publishAll') {
+    group = 'publishing'
+    description = 'Publishes the NeoForge project across the primary version of every version range folder.'
+
+    doLast {
+        def baseVersionsDir = file("${project.rootDir}/versions")
+        if (!baseVersionsDir.exists() || !baseVersionsDir.isDirectory()) {
+            throw new GradleException("Versions directory missing at ${baseVersionsDir.absolutePath}")
+        }
+
+        // 1. Scan the versions directory for all rule folders
+        def ruleFolders = baseVersionsDir.listFiles()?.findAll { dir ->
+            dir.isDirectory() && !dir.name.startsWith('.') && !dir.name.startsWith("_")
+                    && (new File(dir, 'neoforge').isDirectory() || new File(dir, 'common').isDirectory())
+        } ?: []
+
+        // 2. Resolve the first Minecraft version for each range folder
+        Set<String> targetVersions = [] as Set
+        ruleFolders.each { folder ->
+            // Pass folder name or extract the range to get mapped versions
+            def versions = VersionUtil.getVersionsFromDirectory(project.rootDir.toString(), folder)
+            if (versions && versions.length > 0) {
+                // Pick the first version in the sorted/resolved range
+                targetVersions << versions[0].replaceAll(/(\.0)$/, '')
+            }
+        }
+
+        println "Found target primary versions to build: ${targetVersions}"
+
+        targetVersions.each { mcVer ->
+            println "\n=========================================="
+            println "  Publishing NeoForge for Minecraft: ${mcVer}"
+            println "==========================================\n"
+
+            def connectionObj = GradleConnector.newConnector().forProjectDirectory(project.rootDir);
+            if(System.getenv("GRADLE_DIRECTORY") != null){ // i dualboot linux and windows, linux has less space so i use windows partition for gradle.
+                connectionObj.useGradleUserHomeDir(System.getenv("GRADLE_DIRECTORY") as File)
+            }
+            def connection = connectionObj.connect();
+            try {
+                connection.newBuild()
+                        .forTasks(':neoforge:modrinth')
+                        .setEnvironmentVariables([MINECRAFT_VERSION: mcVer, MODRINTH_TOKEN: System.getenv("MODRINTH_TOKEN")] as Map<String, String>)
+                        .setStandardOutput(System.out)
+                        .setStandardError(System.err)
+                        .run()
+            } finally {
+                connection.close()
+            }
+        }
+    }
+}
+
+//apply plugin: "com.wanomaniac.minotaur"
+apply plugin: "com.modrinth.minotaur"
+
+modrinth {
+    token       = project.modrinthTOKEN
+    projectId   = project.modrinthID     // numeric ID or slug
+    versionNumber = project.version.toString()     // or manually set
+    versionName   = project.mod_name.toString()+" "+project.version.toString()     // optional
+    changelog     = file(rootDir.toString()+"/CHANGELOG.md").text       // or a string
+    loaders       = ["neoforge"]
+    gameVersions  = VersionUtil.getEffectiveVersionRangeArray(project.rootDir.toString(),  project.minecraft_version.toString(), "neoforge").toList()
+    uploadFile    = tasks.named("jar")
+//    clientSide = "required"
+//    serverSide = "required"
 }

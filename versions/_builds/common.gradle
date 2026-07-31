@@ -1,0 +1,145 @@
+//def mcVersion = project.property("minecraft_version") // e.g., "1.21.7"
+//def versionsDir = file("${project.rootDir}/versions")
+//
+//def matchingFolders = versionsDir.listFiles()?.findAll { dir ->
+//    dir.isDirectory() && VersionUtil.versionMatches(dir.name, mcVersion)
+//} ?: []
+//
+//if (matchingFolders.isEmpty()) {
+//    throw new GradleException("No matching version folder found for ${mcVersion}! This is a developer error, implement a folder for this.")
+//}
+//
+//def selectedVersionDir = matchingFolders[0] // pick the first match
+//println "[Common] Building for ${minecraft_version} using folder ${selectedVersionDir.name}"
+//
+//ext.version_number = selectedVersionDir.name
+//
+//def mergedSourceDir = file("$buildDir/mergedSources")
+//
+//tasks.register("mergeSources") {
+//    doLast {
+//        // Clear previous contents
+//        mergedSourceDir.deleteDir()
+//        mergedSourceDir.mkdirs()
+//
+//        copy {
+//            from "${selectedVersionDir}/common/java"
+//            into "${mergedSourceDir}/java"
+//        }
+//
+//        // Copy new sources
+//        copy {
+//            from "${project.rootDir}/common/src/main/java"
+//            into "${mergedSourceDir}/java"
+//        }
+//
+//        // Copy resources if needed
+//        copy {
+//            from "${selectedVersionDir}/common/resources"
+//            into "${mergedSourceDir}/resources"
+//        }
+//        copy {
+//            from "${project.rootDir}/common/src/main/resources"
+//            into "${mergedSourceDir}/resources"
+//        }
+//    }
+//}
+//
+//sourceSets {
+//    common {
+//        java.srcDirs = ["${project.rootDir}/common/src/main/java", "${selectedVersionDir}/common/java"]
+//        resources.srcDirs = ["${project.rootDir}/common/src/main/resources", "${selectedVersionDir}/common/resources"]
+//
+//        compileClasspath += sourceSets.main.compileClasspath
+//        runtimeClasspath += sourceSets.main.runtimeClasspath
+//    }
+//}
+//
+//sourceSets.main {
+//    java.srcDirs = ["$buildDir/mergedSources/java"]
+//    resources.srcDirs = ["$buildDir/mergedSources/resources"]
+//}
+//
+
+def mcVersion = project.property("minecraft_version") // e.g., "1.21.4"
+def versionsDir = file("${project.rootDir}/versions")
+
+// 1. Collect all matching directories
+def matchingFolders = versionsDir.listFiles()?.findAll { dir ->
+    dir.isDirectory() && VersionUtil.versionMatches(dir.name, mcVersion)
+} ?: []
+
+if (matchingFolders.isEmpty()) {
+    throw new GradleException("No matching version folder found for ${mcVersion}! This is a developer error, implement a folder for this.")
+}
+
+// 2. Sort folders by specificity (shorter name length = broader range like "1.21-1.21.5", longer = "1.21.4")
+matchingFolders.sort { a, b -> a.name.length() <=> b.name.length() }
+
+println "[Common] Building for ${mcVersion} using folders: ${matchingFolders*.name.join(', ')}"
+
+// Expose the list or most specific folder name if external tasks depend on it
+ext.version_number = matchingFolders.last().name
+
+def mergedSourceDir = layout.buildDirectory.dir("mergedSources").get().asFile
+
+tasks.register("mergeSources") {
+    // Declare outputs to ensure proper task caching and up-to-date checks
+    inputs.files(matchingFolders.collect { file("${it}/common") })
+    inputs.dir("${project.rootDir}/common/src/main")
+
+    outputs.dir(mergedSourceDir)
+    doLast {
+        mergedSourceDir.deleteDir()
+        mergedSourceDir.mkdirs()
+
+        // Step A: Copy version folders in order (broader range -> specific override)
+        matchingFolders.each { dir ->
+            def javaDir = file("${dir}/common/java")
+            def resDir = file("${dir}/common/resources")
+
+            if (javaDir.exists()) {
+                copy {
+                    from javaDir
+                    into "${mergedSourceDir}/java"
+                }
+            }
+            if (resDir.exists()) {
+                copy {
+                    from resDir
+                    into "${mergedSourceDir}/resources"
+                }
+            }
+        }
+
+        // Step B: Copy global root common sources last to allow top-level overrides
+        copy {
+            from "${project.rootDir}/common/src/main/java"
+            into "${mergedSourceDir}/java"
+        }
+        copy {
+            from "${project.rootDir}/common/src/main/resources"
+            into "${mergedSourceDir}/resources"
+        }
+    }
+}
+
+sourceSets {
+    common {
+        // Collect java/resource paths across all matching version directories
+        def versionJavaDirs = matchingFolders.collect { file("${it}/common/java") }.findAll { it.exists() }
+        def versionResDirs  = matchingFolders.collect { file("${it}/common/resources") }.findAll { it.exists() }
+
+        java.srcDirs = ["${project.rootDir}/common/src/main/java"] + versionJavaDirs
+        resources.srcDirs = ["${project.rootDir}/common/src/main/resources"] + versionResDirs
+
+        compileClasspath += sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.runtimeClasspath
+    }
+}
+
+sourceSets.main {
+    java.srcDirs = ["${mergedSourceDir}/java"]
+    resources.srcDirs = ["${mergedSourceDir}/resources"]
+}
+

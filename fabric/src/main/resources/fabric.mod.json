@@ -1,22 +1,39 @@
 {
-  "schemaVersion": 1,
-  "id": "economycraft",
-  "version": "${version}",
-  "name": "EconomyCraft",
-  "description": "Simple server-side economy and shop mod.",
-  "authors": ["ReaZip"],
-  "license": "MIT",
-  "environment": "*",
-  "entrypoints": {
-    "main": ["com.reazip.economycraft.fabric.EconomyCraftFabric"],
-    "client": ["com.reazip.economycraft.fabric.client.EconomyCraftFabricClient"],
-    "server": ["com.reazip.economycraft.fabric.server.InitalizerFabricServer"]
-  },
-  "mixins": ["economycraft.mixins.json"],
-  "depends": {
-    "minecraft": "${mcVer}",
-    "fabricloader": ">=0.15.0",
-    "fabric-api": "*",
-    "architectury": ">=${archVer}"
-  }
+    "schemaVersion": 1,
+    "id": "${mod_id}",
+    "version": "${version}",
+    "name": "${mod_name}",
+    "description": "${description}",
+    "authors": [
+        "${mod_author}"
+    ],
+    "contact": {
+        "homepage": "https://modrinth.com/project/wano-economy",
+        "sources": "https://github.com/FabricMC/fabric-example-mod"
+    },
+    "license": "${license}",
+    "icon": "assets/${mod_id}/icon.png",
+    "environment": "*",
+    "entrypoints": {
+        "main": [
+          "com.wanomaniac.economy.fabric.EconomyFabric"
+        ],
+      "server": [
+        "com.wanomaniac.economy.fabric.server.EconomyServer"
+      ],
+      "client": [
+          "com.wanomaniac.economy.fabric.client.EconomyFabricClient"
+        ]
+    },
+    "mixins": [
+        "${mod_id}.mixins.json",
+        "${mod_id}.fabric.mixins.json"
+    ],
+    "depends": {
+        "fabricloader": ">=${fabric_loader_version}",
+        "fabric-api": "*",
+        "minecraft": "${minecraft_version_range}",
+        "java": ">=${java_version}"
+    }
 }
+  
