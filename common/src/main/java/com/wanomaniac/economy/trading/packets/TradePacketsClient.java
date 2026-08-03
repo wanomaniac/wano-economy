@@ -2,7 +2,7 @@ package com.wanomaniac.economy.trading.packets;
 
 import com.wanomaniac.economy.CommonEconomy;
 import com.wanomaniac.economy.trading.client.TradeMenuClientScreen;
-import com.wanomaniac.economy.trading.packets.msgs.SendPlayerBalanceS2CPacket;
+import com.wanomaniac.economy.trading.packets.msgs.TradeSendPlayerBalanceS2CPacket;
 import com.wanomaniac.economy.trading.packets.msgs.SetClientMoneyTextboxStatusS2CPacket;
 import com.wanomaniac.economy.trading.packets.msgs.SyncExtraMoneyPayloadS2CPacket;
 import net.minecraft.client.Minecraft;
@@ -22,7 +22,7 @@ public class TradePacketsClient {
         );
 
         CommonEconomy.packets.registerClientReceiver(
-                SendPlayerBalanceS2CPacket.TYPE,
+                TradeSendPlayerBalanceS2CPacket.TYPE,
                 (payload) -> Minecraft.getInstance().execute(() -> {
                     if (Minecraft.getInstance().screen instanceof TradeMenuClientScreen screen) {
                         screen.playerCurrentMoney = payload.balance();

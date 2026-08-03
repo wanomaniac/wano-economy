@@ -1,4 +1,4 @@
-package com.wanomaniac.economy.trading.packets.msgs;
+package com.wanomaniac.economy.auctioning.packets.msgs;
 
 import com.wanomaniac.economy.CommonEconomy;
 import com.wanomaniac.economy.IdentifierUtils;
@@ -7,9 +7,9 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
-public record SendPlayerBalanceS2CPacket(long balance) implements CustomPacketPayload {
-    public static final Type<SendPlayerBalanceS2CPacket> TYPE =
-            new Type<>(IdentifierUtils.toNative(ModIdentifier.fromNamespaceAndPath(CommonEconomy.MOD_ID,"send_player_balance")));
+public record AuctionSendPlayerBalanceS2CPacket(long balance) implements CustomPacketPayload {
+    public static final Type<AuctionSendPlayerBalanceS2CPacket> TYPE =
+            new Type<>(IdentifierUtils.toNative(ModIdentifier.fromNamespaceAndPath(CommonEconomy.MOD_ID,"auction_send_player_balance")));
 
     @Override
     public Type<? extends CustomPacketPayload> type() {
@@ -17,9 +17,9 @@ public record SendPlayerBalanceS2CPacket(long balance) implements CustomPacketPa
     }
 
     // Codec for encoding/decoding
-    public static final StreamCodec<FriendlyByteBuf, SendPlayerBalanceS2CPacket> CODEC =
+    public static final StreamCodec<FriendlyByteBuf, AuctionSendPlayerBalanceS2CPacket> CODEC =
             StreamCodec.of(
                     (buf, payload) -> buf.writeLong(payload.balance),
-                    buf -> new SendPlayerBalanceS2CPacket(buf.readLong())
+                    buf -> new AuctionSendPlayerBalanceS2CPacket(buf.readLong())
             );
 }

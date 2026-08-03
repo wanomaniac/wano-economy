@@ -2,13 +2,13 @@ package com.wanomaniac.economy.trading.client;
 
 import com.wanomaniac.economy.CommonEconomy;
 import com.wanomaniac.economy.ModIdentifier;
-import com.wanomaniac.economy.client.AbstractInputScreen;
-import com.wanomaniac.economy.client.EditBoxInputUtil;
+import com.wanomaniac.economy.client.AbstractInputContainerScreen;
+import com.wanomaniac.economy.client.GUIInputUtil;
 import com.wanomaniac.economy.client.VersionGuiHandler;
 import com.wanomaniac.economy.client.input.CharacterEvent;
 import com.wanomaniac.economy.client.input.KeyEvent;
 import com.wanomaniac.economy.client.input.MouseButtonEvent;
-import com.wanomaniac.economy.trading.packets.msgs.RequestPlayerBalanceC2SPacket;
+import com.wanomaniac.economy.trading.packets.msgs.TradeRequestPlayerBalanceC2SPacket;
 import com.wanomaniac.economy.trading.packets.msgs.UpdateExtraMoneyPayloadC2SPacket;
 import com.wanomaniac.economy.trading.types.TradeInventoryType;
 import net.minecraft.client.Minecraft;
@@ -22,7 +22,7 @@ import org.lwjgl.glfw.GLFW;
 
 import java.util.UUID;
 
-public class TradeMenuClientScreen extends AbstractInputScreen<TradeInventoryType> {
+public class TradeMenuClientScreen extends AbstractInputContainerScreen<TradeInventoryType> {
     EditBox extraMoneyField;
     public Long playerCurrentMoney = -1L;
     public Long otherPlayerMoney = -1L;
@@ -47,7 +47,7 @@ public class TradeMenuClientScreen extends AbstractInputScreen<TradeInventoryTyp
                 return true; // stop ESC from closing the screen
             }
         } else if(extraMoneyField.isFocused()){
-            EditBoxInputUtil.onKeyPressed(extraMoneyField, event);
+            GUIInputUtil.onEditBoxKeyPressed(extraMoneyField, event);
             return true;
         }
 
@@ -62,7 +62,7 @@ public class TradeMenuClientScreen extends AbstractInputScreen<TradeInventoryTyp
     @Override
     public boolean whenMouseClicked(MouseButtonEvent event, boolean isDoubleClick) {
         // First let the textbox handle the click
-        if (EditBoxInputUtil.onMouseClicked(extraMoneyField, event, isDoubleClick)) {
+        if (GUIInputUtil.onEditBoxMouseClicked(extraMoneyField, event, isDoubleClick)) {
             extraMoneyField.setFocused(true);
             return true;
         }
@@ -149,7 +149,7 @@ public class TradeMenuClientScreen extends AbstractInputScreen<TradeInventoryTyp
         this.extraMoneyField.setFocused(false);
 
         if(playerCurrentMoney == -1L) {
-            CommonEconomy.packets.sendToServer(new RequestPlayerBalanceC2SPacket());
+            CommonEconomy.packets.sendToServer(new TradeRequestPlayerBalanceC2SPacket());
         }
     }
 

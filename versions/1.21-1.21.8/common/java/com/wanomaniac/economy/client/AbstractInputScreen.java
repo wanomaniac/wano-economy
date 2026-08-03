@@ -5,24 +5,17 @@ import com.wanomaniac.economy.client.input.CharacterEvent;
 import com.wanomaniac.economy.client.input.KeyEvent;
 import com.wanomaniac.economy.client.input.MouseButtonEvent;
 import com.wanomaniac.economy.client.input.MouseButtonInfo;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 
 
-public abstract class AbstractInputScreen<T extends AbstractContainerMenu> extends AbstractContainerScreen<T> {
-    public AbstractInputScreen(T menu, Inventory playerInventory, Component title) {
-        super(menu, playerInventory, title);
+public abstract class AbstractInputScreen extends Screen implements InputScreenInterface {
+    public AbstractInputScreen(Component title) {
+        super(title);
     }
-
-    // When true, we continue super
-    // When false, dont continue
-    public abstract boolean whenKeyPressed(KeyEvent event);
-    public abstract boolean whenKeyReleased(KeyEvent event);
-    public abstract boolean whenMouseClicked(MouseButtonEvent event, boolean doubleClick);
-    public abstract boolean whenMouseReleased(MouseButtonEvent event);
-    public abstract boolean whenCharTyped(CharacterEvent event);
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {

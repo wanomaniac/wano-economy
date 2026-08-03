@@ -3,6 +3,7 @@ import com.wanomaniac.economy.interfaces.IPlatformPackets;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -54,6 +55,30 @@ public class PlatformPacketsNeoForge implements IPlatformPackets {
             }
         });
     }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T extends CustomPacketPayload> void registerGlobalPayload(
+            CustomPacketPayload.Type<T> type,
+            StreamCodec<? super RegistryFriendlyByteBuf, T> codec
+    ) {
+        registrar.playBidirectional(type, codec, (payload, context) -> {
+            if(context.flow() == PacketFlow.SERVERBOUND) {
+                TriConsumer<T, MinecraftServer, ServerPlayer> handler = serverHandlers.get(type);
+                if (handler != null && context.player() instanceof ServerPlayer serverPlayer) {
+                    serverPlayer.level().getServer().execute(() ->
+                            handler.accept(payload, serverPlayer.level().getServer(), serverPlayer)
+                    );
+                }
+            } else {
+                Consumer<T> handler = clientHandlers.get(type);
+                if (handler != null) {
+                    Minecraft.getInstance().execute(() -> handler.accept(payload));
+                }
+            }
+        });
+    }
+
 
     @Override
     public <T extends CustomPacketPayload> void registerServerReceiver(

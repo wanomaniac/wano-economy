@@ -22,6 +22,13 @@ public class PlatformEventRegistryFabric implements IPlatformEventRegistry {
     }
 
     @Override
+    public void whenServerTicks(Consumer<MinecraftServer> callback) {
+        EVENT_BUS.addListener((ServerTickEvent.Post event) -> {
+            callback.accept(event.getServer());
+        });
+    }
+
+    @Override
     public void onServerStarting(Consumer<MinecraftServer> callback) {
         ServerLifecycleEvents.SERVER_STARTING.register(callback::accept);
     }

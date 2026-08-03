@@ -13,6 +13,7 @@ import java.util.function.Consumer;
 // Global Minecraft event registrations that are NEEDED!
 public interface IPlatformEventRegistry {
     void whenPlayerJoins(Consumer<ServerPlayer> callback);
+    void whenServerTicks(Consumer<MinecraftServer> callback);
     void onServerStarted(Consumer<MinecraftServer> callback);
     void onServerStarting(Consumer<MinecraftServer> callback);
     void onServerStopping(Consumer<MinecraftServer> callback);

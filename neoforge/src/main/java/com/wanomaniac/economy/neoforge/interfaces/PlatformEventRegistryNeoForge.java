@@ -8,6 +8,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.function.Consumer;
 
@@ -20,6 +21,13 @@ public class PlatformEventRegistryNeoForge implements IPlatformEventRegistry {
             if (event.getEntity() instanceof ServerPlayer serverPlayer) {
                 callback.accept(serverPlayer);
             }
+        });
+    }
+
+    @Override
+    public void whenServerTicks(Consumer<MinecraftServer> callback) {
+        EVENT_BUS.addListener((ServerTickEvent.Post event) -> {
+            callback.accept(event.getServer());
         });
     }
 

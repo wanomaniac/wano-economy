@@ -50,15 +50,19 @@ public class VersionGuiHandler {
     ) {
         if (stack.isEmpty()) return;
 
-        Optional<TooltipComponent> imageTooltip = stack.getTooltipImage();
+        graphics.renderTooltip(font, textTooltip, stack.getTooltipImage(), x, y);
+    }
 
-        // High-level renderTooltip overload in 1.21.3+ handles text + Optional<TooltipComponent>
-        graphics.renderTooltip(
-                font,
-                textTooltip,
-                imageTooltip,
-                x,
-                y
-        );
+    public static void renderItemAndDecorations(GuiGraphics graphics, Font font, ItemStack item, int x, int y, float scale){
+        graphics.pose().pushPose();
+        graphics.pose().translate(x, y, 0);
+        graphics.pose().translate(8.0f, 8.0f, 0);
+        graphics.pose().scale(scale, scale, scale);
+        graphics.pose().translate(-8.0f, -8.0f, 0);
+
+        graphics.renderItem(item, 0, 0);
+        graphics.renderItemDecorations(font, item, 0, 0);
+
+        graphics.pose().popPose();
     }
 }

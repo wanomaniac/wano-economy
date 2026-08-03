@@ -1,5 +1,6 @@
 package com.wanomaniac.economy;
 
+import com.wanomaniac.economy.auctioning.AuctionManager;
 import com.wanomaniac.economy.auctioning.commands.AuctionCommandRegister;
 import com.wanomaniac.economy.auctioning.packets.AuctionPacketsServer;
 import com.wanomaniac.economy.trading.TradeManager;
@@ -13,6 +14,7 @@ import static com.wanomaniac.economy.CommonEconomy.eventRegistry;
 
 public class ServerEconomy {
     public static TradeManager TRADE_MANAGER;
+    public static AuctionManager AUCTION_MANAGER;
 
     public static void initalize(){
         AuctionPacketsServer.register();
@@ -34,9 +36,13 @@ public class ServerEconomy {
             CommonEconomy.getManager(server).save();
         });
         eventRegistry.onServerStarting(server -> TRADE_MANAGER = new TradeManager(server));
+        eventRegistry.onServerStarting(server -> AUCTION_MANAGER = new AuctionManager(server));
         eventRegistry.onServerStopping(server -> TRADE_MANAGER.saveHistory());
+        eventRegistry.onServerStopping(server -> AUCTION_MANAGER.saveHistory());
         eventRegistry.onCommandRegistrationCallback(TradeCommandRegister::registerCommands);
         eventRegistry.onCommandRegistrationCallback(AuctionCommandRegister::registerCommands);
+
+        eventRegistry.whenServerTicks((server) -> AUCTION_MANAGER.tickAllSessions());
 
 
 //        ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register((player, originWorld, destinationWorld) -> {

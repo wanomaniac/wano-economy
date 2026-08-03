@@ -162,14 +162,14 @@ public final class TradeSession {
 
         a.sendSystemMessage(Component.literal("Trade complete!").withStyle(ChatFormatting.GREEN));
         b.sendSystemMessage(Component.literal("Trade complete!").withStyle(ChatFormatting.GREEN));
-        PlayCompleteSound(a);
-        PlayCompleteSound(b);
+        playCompleteSound(a);
+        playCompleteSound(b);
         canceled = true; // it isnt cancelled but the cancel call will not continue if cancel is true, even if when menu is removed.
         TRADE_MANAGER.finishSession(id); // save it to the system
         close();
     }
 
-    private static void PlayCompleteSound(ServerPlayer player){
+    public static void playCompleteSound(ServerPlayer player){
         player.level().playSound(
                 null, // should this be null?
                 player.getX(), player.getY(), player.getZ(),

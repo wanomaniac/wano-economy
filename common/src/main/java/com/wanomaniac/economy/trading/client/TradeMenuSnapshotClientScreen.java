@@ -2,7 +2,7 @@ package com.wanomaniac.economy.trading.client;
 
 import com.wanomaniac.economy.CommonEconomy;
 import com.wanomaniac.economy.ModIdentifier;
-import com.wanomaniac.economy.client.AbstractInputScreen;
+import com.wanomaniac.economy.client.AbstractInputContainerScreen;
 import com.wanomaniac.economy.client.VersionGuiHandler;
 import com.wanomaniac.economy.client.input.CharacterEvent;
 import com.wanomaniac.economy.client.input.KeyEvent;
@@ -18,7 +18,7 @@ import org.lwjgl.glfw.GLFW;
 
 import java.util.UUID;
 
-public class TradeMenuSnapshotClientScreen extends AbstractInputScreen<TradeSnapshotType> {
+public class TradeMenuSnapshotClientScreen extends AbstractInputContainerScreen<TradeSnapshotType> {
     public TradeMenuSnapshotClientScreen(TradeSnapshotType menu, Inventory inv, Component title) {
         super(menu, inv, title);
         this.imageWidth = 176;

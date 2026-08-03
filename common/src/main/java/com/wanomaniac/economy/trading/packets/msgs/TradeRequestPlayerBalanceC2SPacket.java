@@ -7,9 +7,9 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
-public record RequestPlayerBalanceC2SPacket() implements CustomPacketPayload {
-    public static final Type<RequestPlayerBalanceC2SPacket> TYPE =
-            new Type<>(IdentifierUtils.toNative(ModIdentifier.fromNamespaceAndPath(CommonEconomy.MOD_ID,"ask_player_balance")));
+public record TradeRequestPlayerBalanceC2SPacket() implements CustomPacketPayload {
+    public static final Type<TradeRequestPlayerBalanceC2SPacket> TYPE =
+            new Type<>(IdentifierUtils.toNative(ModIdentifier.fromNamespaceAndPath(CommonEconomy.MOD_ID,"trade_ask_player_balance")));
 
     @Override
     public Type<? extends CustomPacketPayload> type() {
@@ -17,10 +17,10 @@ public record RequestPlayerBalanceC2SPacket() implements CustomPacketPayload {
     }
 
     // Codec for encoding/decoding
-    public static final StreamCodec<FriendlyByteBuf, RequestPlayerBalanceC2SPacket> CODEC =
+    public static final StreamCodec<FriendlyByteBuf, TradeRequestPlayerBalanceC2SPacket> CODEC =
             StreamCodec.of(
                     (buf, payload) -> {},
-                    buf -> new RequestPlayerBalanceC2SPacket()
+                    buf -> new TradeRequestPlayerBalanceC2SPacket()
             );
 }
 

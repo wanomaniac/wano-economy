@@ -1,6 +1,7 @@
 package com.wanomaniac.economy.auctioning.server;
 
 import com.wanomaniac.economy.CommonEconomy;
+import com.wanomaniac.economy.ServerEconomy;
 import com.wanomaniac.economy.auctioning.packets.msgs.ConfirmBiddingSelectionS2CPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
@@ -21,19 +22,7 @@ public class AuctioneerMenu extends AbstractContainerMenu {
 
     public AuctioneerMenu(@Nullable MenuType<?> menuType, AuctionSession session, int containerId, Inventory playerInventory) {
         super(menuType, containerId);
-
-//        // 1. Add Main Player Inventory (3 rows x 9 columns = 27 slots)
-//        for (int row = 0; row < 3; ++row) {
-//            for (int col = 0; col < 9; ++col) {
-//                // Index starts at 9 (skip hotbar 0-8), mapped to standard inventory GUI coordinates
-//                this.addSlot(new Slot(playerInventory, col + row * 9 + 9, 8 + col * 18, 84 + row * 18));
-//            }
-//        }
-//
-//        // 2. Add Player Hotbar (9 slots)
-//        for (int col = 0; col < 9; ++col) {
-//            this.addSlot(new Slot(playerInventory, col, 8 + col * 18, 142));
-//        }
+        this.session = session;
 
         int startY = 50;
         for (int row = 0; row < 3; ++row) {
@@ -67,6 +56,12 @@ public class AuctioneerMenu extends AbstractContainerMenu {
             ItemStack selectedItem = slot.getItem();
             CommonEconomy.packets.sendToPlayer((ServerPlayer) player, new ConfirmBiddingSelectionS2CPacket(selectedItem));
         }
+    }
+
+    @Override
+    public void removed(Player player) {
+        if(player.level().isClientSide()) return;
+        ServerEconomy.AUCTION_MANAGER.cancelSession(session.id);
     }
 
     @Override

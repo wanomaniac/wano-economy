@@ -1,9 +1,6 @@
 package com.wanomaniac.economy.trading.packets;
 import com.wanomaniac.economy.CommonEconomy;
-import com.wanomaniac.economy.trading.packets.msgs.RequestPlayerBalanceC2SPacket;
-import com.wanomaniac.economy.trading.packets.msgs.SetClientMoneyTextboxStatusS2CPacket;
-import com.wanomaniac.economy.trading.packets.msgs.SyncExtraMoneyPayloadS2CPacket;
-import com.wanomaniac.economy.trading.packets.msgs.UpdateExtraMoneyPayloadC2SPacket;
+import com.wanomaniac.economy.trading.packets.msgs.*;
 
 public class TradePacketsCommon {
     public static void register(){
@@ -13,8 +10,8 @@ public class TradePacketsCommon {
                 UpdateExtraMoneyPayloadC2SPacket.CODEC
         );
         CommonEconomy.packets.registerC2SPayload(
-                RequestPlayerBalanceC2SPacket.TYPE,
-                RequestPlayerBalanceC2SPacket.CODEC
+                TradeRequestPlayerBalanceC2SPacket.TYPE,
+                TradeRequestPlayerBalanceC2SPacket.CODEC
         );
         CommonEconomy.packets.registerC2SPayload(
                 com.wanomaniac.economy.trading.packets.msgs.NotifySnapshotGuestLongEscapeC2SPacket.TYPE,
@@ -22,8 +19,8 @@ public class TradePacketsCommon {
         );
         // Server -> Client
         CommonEconomy.packets.registerS2CPayload(
-                com.wanomaniac.economy.trading.packets.msgs.SendPlayerBalanceS2CPacket.TYPE,
-                com.wanomaniac.economy.trading.packets.msgs.SendPlayerBalanceS2CPacket.CODEC
+                TradeSendPlayerBalanceS2CPacket.TYPE,
+                TradeSendPlayerBalanceS2CPacket.CODEC
         );
         CommonEconomy.packets.registerS2CPayload(
                 SyncExtraMoneyPayloadS2CPacket.TYPE,

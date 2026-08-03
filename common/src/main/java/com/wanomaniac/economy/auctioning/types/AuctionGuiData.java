@@ -16,10 +16,6 @@ public record AuctionGuiData(
     public static final StreamCodec<RegistryFriendlyByteBuf, AuctionGuiData> STREAM_CODEC = StreamCodec.composite(
             UUIDUtil.STREAM_CODEC, AuctionGuiData::auctionId,
             UUIDUtil.STREAM_CODEC, AuctionGuiData::auctioneer,
-//            ByteBufCodecs.optional(UUIDUtil.STREAM_CODEC), AuctionGuiData::highestBidder,
-//            ItemStack.OPTIONAL_STREAM_CODEC, AuctionGuiData::itemToBid,
-//            ByteBufCodecs.VAR_INT, AuctionGuiData::currentBidPrice,
-//            ByteBufCodecs.BOOL, AuctionGuiData::isAuctioneer,
             AuctionGuiData::new
     );
 }

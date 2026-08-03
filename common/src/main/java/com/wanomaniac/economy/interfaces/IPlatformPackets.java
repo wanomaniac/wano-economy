@@ -25,6 +25,14 @@ public interface IPlatformPackets {
             StreamCodec<? super RegistryFriendlyByteBuf, T> codec
     );
 
+    default <T extends CustomPacketPayload> void registerGlobalPayload(
+            CustomPacketPayload.Type<T> type,
+            StreamCodec<? super RegistryFriendlyByteBuf, T> codec
+    ){
+        registerC2SPayload(type, codec);
+        registerS2CPayload(type, codec);
+    }
+
     /**
      * Register a C2S receiver (runs on the logical server).
      */
@@ -40,6 +48,7 @@ public interface IPlatformPackets {
             CustomPacketPayload.Type<T> type,
             Consumer<T> handler
     );
+
 
     default void registerPayloads(){
         return;

@@ -42,6 +42,10 @@ public class NbtUtil {
         return Optional.of(compoundTag.getCompound(key));
     }
 
+    public static Optional<CompoundTag> getCompoundFromList(ListTag compoundTag, Integer key){
+        return Optional.of(compoundTag.getCompound(key));
+    }
+
     public static Set<String> getKeySetFromCompound(CompoundTag compoundTag){
         return compoundTag.getAllKeys();
     }
