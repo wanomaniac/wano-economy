@@ -65,8 +65,4 @@ public class VersionGuiHandler {
 
         graphics.pose().popPose();
     }
-
-    public static void whenButtonWidgetMouseClick(Button button, MouseButtonEvent event, boolean doubleClick){
-        button.mouseClicked(event.x(), event.y(), event.button());
-    }
 }

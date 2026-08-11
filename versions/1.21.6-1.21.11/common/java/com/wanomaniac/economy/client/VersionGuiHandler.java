@@ -3,14 +3,10 @@ package com.wanomaniac.economy.client;
 
 import com.wanomaniac.economy.IdentifierUtils;
 import com.wanomaniac.economy.ModIdentifier;
-import com.wanomaniac.economy.client.input.KeyEvent;
-import com.wanomaniac.economy.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.client.gui.screens.inventory.tooltip.DefaultTooltipPositioner;
-import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.tooltip.TooltipComponent;
@@ -96,9 +92,5 @@ public class VersionGuiHandler {
         graphics.renderItemDecorations(font, item, 0, 0);
 
         graphics.pose().popMatrix();
-    }
-
-    public static void whenButtonWidgetMouseClick(Button button, MouseButtonEvent event, boolean doubleClick){
-        button.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(event.x(), event.y(), new MouseButtonInfo(event.buttonInfo().button(), event.modifiers())), doubleClick);
     }
 }

@@ -41,7 +41,7 @@ public class EconomyManager {
 
     public EconomyManager(MinecraftServer server) {
         this.server = server;
-        Path dir = server.getFile("config/economy");
+        Path dir = server.getFile("config/wanoeconomy");
         Path dataDir = dir.resolve("data");
         try { Files.createDirectories(dataDir); } catch (IOException ignored) {}
         this.file = dataDir.resolve("balances.json");

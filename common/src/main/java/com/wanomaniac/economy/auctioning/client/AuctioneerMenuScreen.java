@@ -1,11 +1,10 @@
 package com.wanomaniac.economy.auctioning.client;
 
 import com.wanomaniac.economy.CommonEconomy;
-import com.wanomaniac.economy.EconomyManager;
 import com.wanomaniac.economy.ModIdentifier;
-import com.wanomaniac.economy.auctioning.client.widgets.AuctionPlayerListWidget;
-import com.wanomaniac.economy.auctioning.client.widgets.BiddingInfoWidget;
+import com.wanomaniac.economy.auctioning.client.widgets.*;
 import com.wanomaniac.economy.auctioning.packets.msgs.StartBiddingItemC2SPacket;
+import com.wanomaniac.economy.auctioning.packets.msgs.SynchronizeAuctioneerAuctionC2SPacket;
 import com.wanomaniac.economy.auctioning.server.ItemBidding;
 import com.wanomaniac.economy.auctioning.types.AuctioneerMenuType;
 import com.wanomaniac.economy.client.AbstractInputContainerScreen;
@@ -35,13 +34,20 @@ import java.util.UUID;
 public class AuctioneerMenuScreen extends AbstractInputContainerScreen<AuctioneerMenuType> {
     boolean isBiddingActive = false;
     boolean isConfirmationActive = false;
+    boolean isCancelMenuActive = false;
     ItemStack biddingItem = null;
     ItemBidding currentBidding = null;
+    List<ItemBidding> biddings = new ArrayList<>();
     private Button confirmButton;
     private Button cancelButton;
     private EditBox startingPriceBox;
     public List<UUID> bidders = new ArrayList<>();
     public List<UUID> biddersInactive = new ArrayList<>();
+//    private EditBox auctionSearchBox;
+    private AuctionBidListWidget auctionHistoryWidget;
+    private LiveBiddingWidget biddingLiveWidget;
+    private LiveAuctionSidebarWidget auctionSidebarWidget;
+    private final WidgetRedirector redirector;
 
     private static final ModIdentifier CONTAINER_BACKGROUND =
             ModIdentifier.parse("minecraft:textures/gui/container/generic_54.png"); // Standard chest texture frame
@@ -53,6 +59,7 @@ public class AuctioneerMenuScreen extends AbstractInputContainerScreen<Auctionee
         this.imageWidth = 176;
         this.imageHeight = 166;
         this.inventoryLabelY = 72 - 34;
+        redirector = new WidgetRedirector(this);
     }
 
     private int getSlotIndexForItem(ItemStack targetStack) {
@@ -73,10 +80,18 @@ public class AuctioneerMenuScreen extends AbstractInputContainerScreen<Auctionee
 
     void onConfirmBidding(){
         // add netcode
+        if(isCancelMenuActive) {
+            // -1 cancels the bidding.
+            biddings.remove(currentBidding);
+            this.auctionHistoryWidget.updateData(biddings);
+            CommonEconomy.packets.sendToServer(new StartBiddingItemC2SPacket(menu.guiData, -1, 0L));
+            isCancelMenuActive = false;
+        } else {
         isConfirmationActive = false;
         isBiddingActive = true;
         Long startingPrice = Long.parseLong(startingPriceBox.getValue().isEmpty() ? "0" : startingPriceBox.getValue());
         CommonEconomy.packets.sendToServer(new StartBiddingItemC2SPacket(menu.guiData, getSlotIndexForItem(biddingItem), startingPrice));
+        }
     }
 
     @Override
@@ -88,6 +103,28 @@ public class AuctioneerMenuScreen extends AbstractInputContainerScreen<Auctionee
         int modalY = this.height / 2;
         int buttonY = modalY + 50; // Below the item display
 
+        if(auctionHistoryWidget == null) {
+            this.auctionHistoryWidget = new AuctionBidListWidget(10, 30, AuctionPlayerWidget.CARD_WIDTH, 150);
+            redirector.addWidget(auctionHistoryWidget);
+        } else {
+            this.auctionHistoryWidget.setPositionAndBounds(10, 30, AuctionPlayerWidget.CARD_WIDTH, 150);
+        }
+
+        if(biddingLiveWidget == null) {
+            this.biddingLiveWidget = new LiveBiddingWidget(10, 30, AuctionPlayerWidget.CARD_WIDTH, 150);
+            redirector.addWidget(biddingLiveWidget);
+        } else {
+            this.biddingLiveWidget.setPositionAndBounds(10, 30, AuctionPlayerWidget.CARD_WIDTH, 150);
+        }
+        biddingLiveWidget.active = false;
+
+        if(auctionSidebarWidget == null) {
+            this.auctionSidebarWidget = new LiveAuctionSidebarWidget(width - AuctionPlayerWidget.CARD_WIDTH - 10, 30, AuctionPlayerWidget.CARD_WIDTH, 150);
+            redirector.addWidget(auctionSidebarWidget);
+        } else {
+            this.auctionSidebarWidget.setPositionAndBounds(width - AuctionPlayerWidget.CARD_WIDTH - 10, 30, AuctionPlayerWidget.CARD_WIDTH, 150);
+        }
+
         this.confirmButton = Button.builder(
                         Component.literal("Confirm"),
                         btn -> this.onConfirmBidding() // Click handler
@@ -98,8 +135,12 @@ public class AuctioneerMenuScreen extends AbstractInputContainerScreen<Auctionee
         this.cancelButton = Button.builder(
                         Component.literal("Cancel"),
                         btn -> {
-                            biddingItem = null;
-                            isConfirmationActive = false;
+                            if(isCancelMenuActive){
+                                isCancelMenuActive = false;
+                            } else {
+                                biddingItem = null;
+                                isConfirmationActive = false;
+                            }
                         }
                 )
                 .bounds(modalX + 5, buttonY, buttonWidth, buttonHeight)
@@ -127,26 +168,51 @@ public class AuctioneerMenuScreen extends AbstractInputContainerScreen<Auctionee
         this.addRenderableWidget(this.confirmButton);
         this.addRenderableWidget(this.cancelButton);
         this.addRenderableWidget(this.startingPriceBox);
+
+        if(!menu.guiData.isNew()) CommonEconomy.packets.sendToServer(new SynchronizeAuctioneerAuctionC2SPacket());
     }
 
     @Override
     public boolean whenKeyPressed(KeyEvent event) {
         if (isConfirmationActive) {
-            if(event.key() == GLFW.GLFW_KEY_ESCAPE) {
+            if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
                 if (startingPriceBox.isFocused()) {
                     startingPriceBox.setFocused(false);
                     return true; // stop ESC from closing the screen
                 }
                 biddingItem = null;
                 isConfirmationActive = false;
+                return true;
             }
             if(startingPriceBox.isFocused()){
                 setFocused(startingPriceBox);
                 GUIInputUtil.onEditBoxKeyPressed(startingPriceBox, event);
                 return true;
             }
-            return true;
+            return false;
+        }  else if(isBiddingActive && !isCancelMenuActive){
+            if(event.key() == GLFW.GLFW_KEY_ESCAPE) {
+                if(currentBidding.highestBidder() == null){
+                    isCancelMenuActive = true;
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+
+//            if(biddingLiveWidget.whenKeyPressed(event)) return true;
+        } else if(isCancelMenuActive){
+            if(event.key() == GLFW.GLFW_KEY_ESCAPE) {
+                isCancelMenuActive = false;
+                return true;
+            }
+        } else {
+//            if(auctionHistoryWidget.whenKeyPressed(event)) return true;
         }
+
+        if(redirector.whenKeyPressed(event)) return true;
+
+//        if(auctionSidebarWidget.whenKeyPressed(event)) return true;
 
         // If number keys, the player hotbar will be selected
         if (event.key() >= GLFW.GLFW_KEY_1 && event.key() <= GLFW.GLFW_KEY_9) {
@@ -185,9 +251,17 @@ public class AuctioneerMenuScreen extends AbstractInputContainerScreen<Auctionee
             }
 
             startingPriceBox.setFocused(false);
-            VersionGuiHandler.whenButtonWidgetMouseClick(confirmButton, event, doubleClick);
-            VersionGuiHandler.whenButtonWidgetMouseClick(cancelButton, event, doubleClick);
+            GUIInputUtil.onButtonMouseClicked(confirmButton, event, doubleClick);
+            GUIInputUtil.onButtonMouseClicked(cancelButton, event, doubleClick);
             return true;
+        } else if(!isCancelMenuActive) {
+            return redirector.whenMouseClicked(event, doubleClick);
+
+//            boolean click1 = auctionHistoryWidget.mouseClicked(event, doubleClick);
+//            boolean click2 = biddingLiveWidget.mouseClicked(event, doubleClick);
+//            boolean click3 = auctionSidebarWidget.mouseClicked(event, doubleClick);
+//
+//            return click1 || click2 || click3;
         }
 
         return false;
@@ -195,11 +269,45 @@ public class AuctioneerMenuScreen extends AbstractInputContainerScreen<Auctionee
 
     @Override
     public boolean whenMouseReleased(MouseButtonEvent event) {
+        redirector.whenMouseReleased(event);
+
+//        auctionHistoryWidget.mouseReleased(event.button());
+//        biddingLiveWidget.mouseReleased(event.button());
+//        auctionSidebarWidget.mouseReleased(event.button());
+
+        return false;
+    }
+
+
+    @Override
+    public boolean whenMouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (redirector.whenMouseScrolled(mouseX, mouseY, scrollY)) return true;
+
+//        if (auctionHistoryWidget.mouseScrolled(mouseX, mouseY, scrollY)) return true;
+//        if (biddingLiveWidget.mouseScrolled(mouseX, mouseY, scrollY)) return true;
+//        if (auctionSidebarWidget.mouseScrolled(mouseX, mouseY, scrollY)) return true;
+
+        return false;
+    }
+
+    @Override
+    public boolean whenMouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+        if (redirector.whenMouseDragged(event.y())) return true;
+//        if (auctionHistoryWidget.mouseDragged(event.y())) return true;
+//        if (biddingLiveWidget.mouseDragged(event.y())) return true;
+//        if (auctionSidebarWidget.mouseDragged(event.y())) return true;
+
         return false;
     }
 
     @Override
     public boolean whenCharTyped(CharacterEvent event) {
+        if(redirector.whenCharTyped(event)) return true;
+
+//        if(auctionHistoryWidget.whenCharTyped(event)) return true;
+//        if(biddingLiveWidget.whenCharTyped(event)) return true;
+//        if(auctionSidebarWidget.whenCharTyped(event)) return true;
+
         return false;
     }
 
@@ -276,16 +384,39 @@ public class AuctioneerMenuScreen extends AbstractInputContainerScreen<Auctionee
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float delta) {
         if(isBiddingActive || isConfirmationActive){
+            auctionHistoryWidget.active = false;
+            auctionSidebarWidget.active = true;
             // Render unique UIS for different cases, menu overlay UI will have to be disabled while these are active.
             g.fillGradient(0, 0, this.width, this.height, -1072689136, -804253680);
-            if(isConfirmationActive) renderConfirmationModal(g, mouseX, mouseY, delta);
+            if(isCancelMenuActive || isConfirmationActive) {
+                auctionSidebarWidget.active = false;
+                if (isConfirmationActive) renderConfirmationModal(g, mouseX, mouseY, delta);
+                if(isCancelMenuActive) renderCancelModel(g, mouseX, mouseY, delta);
+
+                confirmButton.visible = true;
+                cancelButton.visible = true;
+                startingPriceBox.visible = true;
+                confirmButton.render(g, mouseX, mouseY, delta);
+                cancelButton.render(g, mouseX, mouseY, delta);
+                if (isConfirmationActive) startingPriceBox.render(g, mouseX, mouseY, delta);
+            }
             else if(isBiddingActive) renderBiddingAuctioneer(g, mouseX, mouseY, delta);
         } else {
+            super.render(g, mouseX, mouseY, delta);
+            auctionSidebarWidget.active = true;
+            auctionHistoryWidget.active = true;
+            biddingLiveWidget.active = false;
+
+            this.auctionHistoryWidget.updateData(biddings);
+            auctionHistoryWidget.render(g, mouseX, mouseY, delta);
+
             confirmButton.visible = false;
             cancelButton.visible = false;
             startingPriceBox.visible = false;
-            super.render(g, mouseX, mouseY, delta);
         }
+
+        auctionSidebarWidget.updateData(menu.guiData, currentBidding, bidders, biddersInactive);
+        auctionSidebarWidget.render(g, mouseX, mouseY, delta);
     }
 
     private void renderBiddingAuctioneer(GuiGraphics g, int mouseX, int mouseY, float delta) {
@@ -302,18 +433,62 @@ public class AuctioneerMenuScreen extends AbstractInputContainerScreen<Auctionee
                     0xFFFFFFFF // White text color
             );
         } else {
+            biddingLiveWidget.active = true;
             // Add dynamic timer line on top of the screen where the width gets smaller from the time
             AuctionScreenUtil.drawTimerLine(g, currentBidding, width);
-            AuctionPlayerListWidget.renderBiddingSidebar(g, menu.guiData, currentBidding, mouseX, mouseY);
-            AuctionPlayerListWidget.renderAuctionSidebar(g, currentBidding, menu.guiData, bidders, biddersInactive, width, mouseX, mouseY);
+            biddingLiveWidget.updateData(currentBidding);
+            biddingLiveWidget.render(g, mouseX, mouseY, delta);
+//            AuctionPlayerListWidget.renderAuctionSidebar(g, currentBidding, menu.guiData, bidders, biddersInactive, width, mouseX, mouseY);
             BiddingInfoWidget.render(g,  currentBidding, width, height, mouseX, mouseY);
 
-            if(currentBidding.currentBid() != 0){
-                g.drawString(Minecraft.getInstance().font, Component.literal("Up for $"+ currentBidding.currentBid()), modalX, 65, 0xFF55FF55);
+            if(currentBidding.highestBidder() != null){
+                int faceSize = 16;
+                int spacing = 4;
+                Component text = Component.literal(AuctionUtils.getPlayerUsername(currentBidding.highestBidder()) + " has bidded $" + currentBidding.currentBid());
+                int textWidth = this.font.width(text);
+                int totalWidth = faceSize + spacing + textWidth;
+                int startX = modalX - (totalWidth / 2);
+                int textY = 45;
+                int fontHeight = 9;
+                int faceY = textY + (fontHeight - faceSize) / 2;
+
+                AuctionPlayerWidget.renderPlayFace(g, startX-2, faceY-1, currentBidding.highestBidder());
+                g.drawString(
+                        this.font,
+                        text,
+                        startX + faceSize + spacing,
+                        textY,
+                        0xFFFFFFFF,
+                        true
+                );
+            } else {
+                Component text = Component.literal("Item is up for sale for a minimum of $"+currentBidding.currentBid());
+                int startX = modalX - (this.font.width(text) / 2);
+                g.drawString(
+                        this.font,
+                        text,
+                        startX,
+                        45,
+                        0xFFFFFFFF,
+                        true
+                );
             }
-
-
         }
+    }
+
+
+    private void renderCancelModel(GuiGraphics g, int mouseX, int mouseY, float delta) {
+        int modalX = (this.width) / 2;
+        int modalY = (this.height) / 2;
+
+        Component confirmMessage = Component.literal("Are you sure you want to cancel this bidding?");
+        g.drawCenteredString(
+                this.font,
+                confirmMessage,
+                modalX,
+                modalY,
+                0xFFFFFFFF // White text color
+        );
     }
 
     private void renderConfirmationModal(GuiGraphics g, int mouseX, int mouseY, float delta) {
@@ -341,7 +516,6 @@ public class AuctioneerMenuScreen extends AbstractInputContainerScreen<Auctionee
             List<Component> textTooltip = getTooltipFromItem(this.minecraft, this.biddingItem);
             Optional<TooltipComponent> imageTooltip = this.biddingItem.getTooltipImage();
 
-
             List<ClientTooltipComponent> components = textTooltip.stream()
                     .map(Component::getVisualOrderText)
                     .map(ClientTooltipComponent::create)
@@ -356,14 +530,6 @@ public class AuctioneerMenuScreen extends AbstractInputContainerScreen<Auctionee
                     tooltipY,
                     textTooltip
             );
-
-            confirmButton.visible = true;
-            cancelButton.visible = true;
-            startingPriceBox.visible = true;
-
-            confirmButton.render(g, mouseX, mouseY, delta);
-            cancelButton.render(g, mouseX, mouseY, delta);
-            startingPriceBox.render(g, mouseX, mouseY, delta);
         }
     }
 
@@ -378,6 +544,7 @@ public class AuctioneerMenuScreen extends AbstractInputContainerScreen<Auctionee
             bidders.remove(playerID);
         }
 
+        if(bidders.contains(playerID)) return;
         bidders.add(playerID);
     }
 
@@ -390,16 +557,16 @@ public class AuctioneerMenuScreen extends AbstractInputContainerScreen<Auctionee
             bidders.removeAll(biddersInactive);
             biddersInactive.clear();
         }
-
         if(bidding == null){
             isBiddingActive = false;
+        } else if(bidding.isActive()){
+            isBiddingActive = true;
         }
 
         currentBidding = bidding;
-
-        if(currentBidding == null) return;
-        if(currentBidding.isExpired()){
-
-        }
+        if(bidding == null) return;
+        biddings.removeIf(b -> b.id().equals(bidding.id()));
+        biddings.add(bidding);
+        this.auctionHistoryWidget.updateData(biddings);
     }
 }

@@ -5,6 +5,7 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -23,9 +24,7 @@ public class PlatformEventRegistryFabric implements IPlatformEventRegistry {
 
     @Override
     public void whenServerTicks(Consumer<MinecraftServer> callback) {
-        EVENT_BUS.addListener((ServerTickEvent.Post event) -> {
-            callback.accept(event.getServer());
-        });
+        ServerTickEvents.START_SERVER_TICK.register(callback::accept);
     }
 
     @Override

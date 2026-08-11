@@ -3,8 +3,10 @@ package com.wanomaniac.economy.client;
 
 import com.wanomaniac.economy.IdentifierUtils;
 import com.wanomaniac.economy.ModIdentifier;
+import com.wanomaniac.economy.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.tooltip.TooltipComponent;

@@ -1,14 +1,12 @@
 package com.wanomaniac.economy.auctioning.packets;
 
 import com.wanomaniac.economy.CommonEconomy;
-import com.wanomaniac.economy.ServerEconomy;
+import com.wanomaniac.economy.auctioning.client.AuctionSnapshotScreen;
 import com.wanomaniac.economy.auctioning.client.AuctioneerMenuScreen;
 import com.wanomaniac.economy.auctioning.client.BidderScreen;
 import com.wanomaniac.economy.auctioning.packets.msgs.*;
-import com.wanomaniac.economy.auctioning.server.AuctionSession;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerPlayer;
 
 public class AuctionPacketsClient {
     public static void register() {
@@ -58,6 +56,13 @@ public class AuctionPacketsClient {
                 InitalizeBidderScreenS2CPacket.TYPE,
                 (payload) -> Minecraft.getInstance().execute(() -> {
                     Minecraft.getInstance().setScreen(new BidderScreen(Component.literal("")));
+                })
+        );
+
+        CommonEconomy.packets.registerClientReceiver(
+                InitalizeSnapshotScreenS2CPacket.TYPE,
+                (payload) -> Minecraft.getInstance().execute(() -> {
+                    Minecraft.getInstance().setScreen(new AuctionSnapshotScreen(Component.literal(""), payload.session(), payload.details().isPresent() ? payload.details().get() : null));
                 })
         );
 

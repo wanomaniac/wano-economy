@@ -40,6 +40,18 @@ public abstract class AbstractInputContainerScreen<T extends AbstractContainerMe
     }
 
     @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if(!whenMouseScrolled(mouseX, mouseY, scrollX, scrollY)) return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        else return true;
+    }
+
+    @Override
+    public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double dragX, double dragY) {
+        if(!whenMouseDragged(new MouseButtonEvent(event.x(), event.y(), new MouseButtonInfo(event.buttonInfo().button(), event.buttonInfo().modifiers())), dragX, dragY)) return super.mouseDragged(event, dragX, dragY);
+        else return true;
+    }
+
+    @Override
     public boolean charTyped(net.minecraft.client.input.CharacterEvent event) {
         if(!whenCharTyped(new CharacterEvent(event.codepoint(), event.modifiers()))) return super.charTyped(event);
         else return true;

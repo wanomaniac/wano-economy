@@ -1,9 +1,7 @@
 package com.wanomaniac.economy.auctioning.client;
 
 import com.wanomaniac.economy.CommonEconomy;
-import com.wanomaniac.economy.auctioning.client.widgets.AuctionPlayerListWidget;
-import com.wanomaniac.economy.auctioning.client.widgets.AuctionPlayerWidget;
-import com.wanomaniac.economy.auctioning.client.widgets.BiddingInfoWidget;
+import com.wanomaniac.economy.auctioning.client.widgets.*;
 import com.wanomaniac.economy.auctioning.packets.msgs.AuctionRequestPlayerBalanceC2SPacket;
 import com.wanomaniac.economy.auctioning.packets.msgs.BidMoneyC2SPacket;
 import com.wanomaniac.economy.auctioning.packets.msgs.BidderLeavePacket;
@@ -33,20 +31,22 @@ public class BidderScreen extends AbstractInputScreen {
     public List<UUID> biddersInactive = new ArrayList<>();
     EditBox moneyField;
     Button bidButton;
-    long lastMoney;
+    long lastMoney = 1L;
     long currentBiddedMoney = 0L;
     long playerCurrentMoney = -1L;
     boolean hasTextboxChanged;
     boolean hasSynchronizedMoney;
+    LiveAuctionSidebarWidget auctionSidebarWidget;
+    LiveBiddingWidget biddingSidebarWidget;
+    final WidgetRedirector redirector;
 
     public BidderScreen(Component title) {
         super(title);
+        redirector = new WidgetRedirector(this);
     }
-
 
     @Override
     public boolean whenKeyPressed(KeyEvent event) {
-        // ESC key
         if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
             if (moneyField.isFocused()) {
                 moneyField.setFocused(false);
@@ -57,6 +57,8 @@ public class BidderScreen extends AbstractInputScreen {
             GUIInputUtil.onEditBoxKeyPressed(moneyField, event);
             return true;
         }
+
+        if(redirector.whenKeyPressed(event)) return true;
 
         return false; // dont stop here
     }
@@ -75,11 +77,13 @@ public class BidderScreen extends AbstractInputScreen {
             return true;
         }
 
-        if(Long.parseLong(moneyField.getValue().isEmpty() ? "0" : moneyField.getValue()) <= currentBiddedMoney){
-            moneyField.setValue(String.valueOf(currentBiddedMoney+1));
+        if(Long.parseLong(moneyField.getValue().isEmpty() ? "1" : moneyField.getValue()) < currentBiddedMoney){
+            moneyField.setValue(String.valueOf(currentBiddedMoney));
         }
         moneyField.setFocused(false);
         GUIInputUtil.onButtonMouseClicked(bidButton, event, isDoubleClick);
+
+        if(redirector.whenMouseClicked(event, isDoubleClick)) return true;
 
         // Continue normal mouse click flow
         return false;
@@ -87,11 +91,26 @@ public class BidderScreen extends AbstractInputScreen {
 
     @Override
     public boolean whenMouseReleased(MouseButtonEvent event) {
+        redirector.whenMouseReleased(event);
         return false;
     }
 
     @Override
+    public boolean whenMouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if(redirector.whenMouseScrolled(mouseX, mouseY, scrollY)) return true;
+        return false;
+    }
+
+    @Override
+    public boolean whenMouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+        if(redirector.whenMouseDragged(event.y())) return true;
+        return false;
+    }
+
+
+    @Override
     public boolean whenCharTyped(CharacterEvent event) {
+        if(redirector.whenCharTyped(event)) return true;
         return false;
     }
 
@@ -114,11 +133,16 @@ public class BidderScreen extends AbstractInputScreen {
                 Component.literal("Extra money")
         );
         moneyField.setEditable(false);
-        moneyField.setValue(Long.toString(currentBiddedMoney+1));
+        moneyField.setValue(Long.toString(1));
         moneyField.setFilter(s -> s.matches("\\d*"));
         moneyField.setResponder(text -> {
             try {
                 long val = Long.parseLong(text);
+
+                if(val == 0){
+                    moneyField.setValue(String.valueOf(1));
+                    return;
+                }
 
                 if (val > playerCurrentMoney) {
                     moneyField.setValue(String.valueOf(playerCurrentMoney));
@@ -133,11 +157,25 @@ public class BidderScreen extends AbstractInputScreen {
         });
 
         int buttonX = boxX + boxWidth + 4;
-
         this.bidButton = Button.builder(Component.literal("Bid"), button -> CommonEconomy.packets.sendToServer(new BidMoneyC2SPacket(guiData.auctionId(), lastMoney)))
                 .bounds(buttonX, boxY - 1, 50, boxHeight + 2) // Slight height padding to match EditBox borders nicely
                 .build();
         bidButton.active = false;
+
+        if(biddingSidebarWidget == null) {
+            this.biddingSidebarWidget = new LiveBiddingWidget(10, 30, AuctionPlayerWidget.CARD_WIDTH, 150);
+            redirector.addWidget(biddingSidebarWidget);
+        } else {
+            this.biddingSidebarWidget.setPositionAndBounds(10, 30, AuctionPlayerWidget.CARD_WIDTH, 150);
+        }
+        biddingSidebarWidget.active = false;
+
+        if(auctionSidebarWidget == null) {
+            this.auctionSidebarWidget = new LiveAuctionSidebarWidget(width - AuctionPlayerWidget.CARD_WIDTH - 10, 30, AuctionPlayerWidget.CARD_WIDTH, 150);
+            redirector.addWidget(auctionSidebarWidget);
+        } else {
+            this.auctionSidebarWidget.setPositionAndBounds(width - AuctionPlayerWidget.CARD_WIDTH - 10, 30, AuctionPlayerWidget.CARD_WIDTH, 150);
+        }
 
         this.addRenderableWidget(this.bidButton);
         this.addWidget(this.moneyField);
@@ -162,11 +200,14 @@ public class BidderScreen extends AbstractInputScreen {
             } else {
                 moneyField.setEditable(true);
                 bidButton.active = true;
+                bidButton.visible = true;
             }
+        } else {
+            bidButton.visible = false;
         }
-        super.render(graphics, x, y, partialTick);
 
         graphics.fillGradient(0, 0, this.width, this.height, -1072689136, -804253680);
+        super.render(graphics, x, y, partialTick);
 
         if(!loaded || playerCurrentMoney == -1L){
             graphics.drawCenteredString(
@@ -179,8 +220,10 @@ public class BidderScreen extends AbstractInputScreen {
 
             return;
         }
-        AuctionPlayerListWidget.renderAuctionSidebar(graphics, currentBidding, guiData, bidders, biddersInactive, width, x, y);
+        auctionSidebarWidget.updateData(guiData, currentBidding, bidders, biddersInactive);
+        auctionSidebarWidget.render(graphics, x, y, partialTick);
         if(currentBidding == null){
+            biddingSidebarWidget.active = false;
             graphics.drawCenteredString(
                     this.font,
                     Component.literal("Waiting for bidding..."),
@@ -188,13 +231,14 @@ public class BidderScreen extends AbstractInputScreen {
                     modalY,
                     0xFFFFFFFF // White text color
             );
-
             return;
         }
 
         moneyField.render(graphics, x, y, partialTick);
         AuctionScreenUtil.drawTimerLine(graphics, currentBidding, width);
-        AuctionPlayerListWidget.renderBiddingSidebar(graphics, guiData, currentBidding, x, y);
+        biddingSidebarWidget.active = true;
+        biddingSidebarWidget.updateData(currentBidding);
+        biddingSidebarWidget.render(graphics, x, y, partialTick);
 
         if(currentBidding.highestBidder() == null) {
             graphics.drawCenteredString(
@@ -205,21 +249,32 @@ public class BidderScreen extends AbstractInputScreen {
                     0xFFFFFFFF // White text color
             );
         } else {
-            AuctionPlayerWidget.renderPlayFace(graphics, modalX - 16, 45, currentBidding.highestBidder());
-            graphics.drawCenteredString(
+            int faceSize = 16;
+            int spacing = 4;
+            Component text = Component.literal(AuctionUtils.getPlayerUsername(currentBidding.highestBidder()) + " has bidded $" + currentBidding.currentBid());
+            int textWidth = this.font.width(text);
+            int totalWidth = faceSize + spacing + textWidth;
+            int startX = modalX - (totalWidth / 2);
+            int textY = 45;
+            int fontHeight = 9;
+            int faceY = textY + (fontHeight - faceSize) / 2;
+
+            AuctionPlayerWidget.renderPlayFace(graphics, startX-5, faceY-2, currentBidding.highestBidder());
+            graphics.drawString(
                     this.font,
-                    Component.literal("Bidded $"+currentBidding.currentBid()),
-                    modalX,
-                    45,
-                    0xFFFFFFFF // White text color
+                    text,
+                    startX + faceSize + spacing,
+                    textY,
+                    0xFFFFFFFF,
+                    true
             );
         }
 
         graphics.drawCenteredString(
                 this.font,
-                Component.literal("You will have $"+(playerCurrentMoney-lastMoney)),
+                Component.literal("You will have $"+(playerCurrentMoney-lastMoney)+ " if you bid $"+lastMoney),
                 modalX,
-                57,
+                66,
                 0xFFFFFFFF // White text color
         );
 
@@ -265,7 +320,6 @@ public class BidderScreen extends AbstractInputScreen {
         if(currentBidding.currentBid() > 0){
             currentBiddedMoney = currentBidding.currentBid();
         }
-
     }
 
     public void syncMoney(long balance){

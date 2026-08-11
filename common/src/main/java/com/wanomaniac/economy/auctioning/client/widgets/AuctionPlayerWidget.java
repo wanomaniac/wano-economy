@@ -1,5 +1,7 @@
 package com.wanomaniac.economy.auctioning.client.widgets;
 
+import com.wanomaniac.economy.auctioning.client.AuctionUtils;
+import com.wanomaniac.economy.auctioning.server.ItemBidding;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -25,7 +27,7 @@ public class AuctionPlayerWidget {
         graphics.fill(x, y, x + CARD_WIDTH, y + CARD_HEIGHT, 0x88000000); // Dark semi-transparent background
         graphics.fill(x, y, x + 2, y + CARD_HEIGHT, roleColor);          // Role indicator stripe on left edge
 
-        if (playerUuid != null && mc.getConnection() != null) {
+        if (mc.getConnection() != null) {
             PlayerInfo playerInfo = mc.getConnection().getPlayerInfo(playerUuid);
             if (playerInfo != null) {
                 PlayerFaceRenderer.draw(graphics, playerInfo.getSkin(), x + 6, y + 4, 16);
@@ -76,5 +78,27 @@ public class AuctionPlayerWidget {
                 graphics.drawString(mc.font, questionMark, textX, textY, 0xFFFF3333, false); // Bright red
             }
         }
+    }
+
+    public static void renderBiddingPlayerText(GuiGraphics graphics, ItemBidding currentBidding){
+        int faceSize = 16;
+        int spacing = 4;
+        Component text = Component.literal(AuctionUtils.getPlayerUsername(currentBidding.highestBidder()) + " won by bidding $" + currentBidding.currentBid());
+        int textWidth = Minecraft.getInstance().font.width(text);
+        int totalWidth = faceSize + spacing + textWidth;
+        int startX = (Minecraft.getInstance().screen.width / 2 ) - (totalWidth / 2);
+        int textY = 45;
+        int fontHeight = 9;
+        int faceY = textY + (fontHeight - faceSize) / 2;
+
+        AuctionPlayerWidget.renderPlayFace(graphics, startX-5, faceY-5, currentBidding.highestBidder());
+        graphics.drawString(
+                Minecraft.getInstance().font,
+                text,
+                startX + faceSize + spacing,
+                textY,
+                0xFFFFFFFF,
+                true
+        );
     }
 }

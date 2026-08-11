@@ -1,6 +1,4 @@
 package com.wanomaniac.economy.auctioning.server;
-
-import com.mojang.serialization.DataResult;
 import com.wanomaniac.economy.trading.NbtUtil;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.*;
@@ -18,7 +16,7 @@ public class ItemBidding {
     private UUID highestBidder;
     private long currentBid;
     private final ItemStack item;
-    private boolean cancelled;
+    public boolean finalized = false;
     private boolean active;
     public static final int MAX_REMAINING_TICKS = 30 * 20; // Cap at 30 seconds
 
@@ -26,13 +24,12 @@ public class ItemBidding {
     private long endTimestamp = 0;   // Target expiration time in epoch milliseconds
     public static final long MS_PER_TICK = 50L;      // 1 tick = 50ms
 
-    public ItemBidding(UUID id, Map<UUID, Long> bidHistory, UUID highestBidder, long currentBid, ItemStack item, boolean cancelled, boolean active, long endTimestamp) {
+    public ItemBidding(UUID id, Map<UUID, Long> bidHistory, UUID highestBidder, long currentBid, ItemStack item, boolean active, long endTimestamp) {
         this.id = id;
         this.bidHistory = new HashMap<>(bidHistory); // Ensure map is mutable!
         this.highestBidder = highestBidder;
         this.currentBid = currentBid;
         this.item = item;
-        this.cancelled = cancelled;
         this.active = active;
 
         if(endTimestamp == 0) this.endTimestamp = System.currentTimeMillis() + (MAX_REMAINING_TICKS * MS_PER_TICK);
@@ -41,26 +38,30 @@ public class ItemBidding {
 
     // Convenience constructor for starting a new bidding session
     public ItemBidding(ItemStack item, Long startingPrice) {
-        this(UUID.randomUUID(), new HashMap<>(), null, startingPrice, item, false, true, 0);
+        this(UUID.randomUUID(), new HashMap<>(), null, startingPrice, item, true, 0);
     }
 
-    public ItemBidding(CompoundTag tag){
+    public ItemBidding(CompoundTag tag, MinecraftServer server){ // this is insecure as shit but oh well.
         id = UUID.fromString(NbtUtil.getStringFromCompound(tag, "Id").get());
         this.bidHistory = new HashMap<>();
 
         ListTag bidHistoryTag = NbtUtil.getListFromCompound(tag, "BidHistory").get();
         for (int i = 0; i < bidHistoryTag.size(); i++) {
-            CompoundTag biddingTag = NbtUtil.getCompoundFromList(bidHistoryTag, i).get();;
+            CompoundTag biddingTag = NbtUtil.getCompoundFromList(bidHistoryTag, i).get();
             UUID id = UUID.fromString(NbtUtil.getStringFromCompound(biddingTag, "Bidder").get());
             Long amount = NbtUtil.getLongFromCompound(biddingTag, "Amount").get();
             bidHistory.put(id, amount);
         }
+
+        if(!NbtUtil.getStringFromCompound(tag, "HighestBidder").get().isEmpty()) {
+            this.highestBidder = UUID.fromString(NbtUtil.getStringFromCompound(tag, "HighestBidder").get());
+        }
         this.currentBid = NbtUtil.getLongFromCompound(tag, "CurrentBid").get();
         CompoundTag stackTag = NbtUtil.getCompoundFromCompound(tag, "Item").get();
         this.item = ItemStack.CODEC
-                .parse(NbtOps.INSTANCE, stackTag).getOrThrow();
-        cancelled = NbtUtil.getCompoundBooleanOr(tag, "Cancelled", false);
+                .parse(server.registryAccess().createSerializationContext(NbtOps.INSTANCE), stackTag).getOrThrow();
         active = NbtUtil.getCompoundBooleanOr(tag, "Active", false);
+        finalized = NbtUtil.getCompoundBooleanOr(tag, "Finalized", false);
     }
 
     public void tick() {
@@ -93,7 +94,7 @@ public class ItemBidding {
     }
 
     public boolean placeBid(UUID player, long price) {
-        if (this.cancelled || price <= this.currentBid || !this.active) {
+        if (price < this.currentBid || !this.active || price == 0) {
             return false;
         }
 
@@ -114,22 +115,11 @@ public class ItemBidding {
         return true;
     }
 
-    public void cancel() {
-        this.cancelled = true;
-    }
-
-    public List<Map.Entry<UUID, Long>> getTopBids(int limit) {
-        return this.bidHistory.entrySet().stream()
-                .sorted(Map.Entry.<UUID, Long>comparingByValue().reversed())
-                .limit(limit)
-                .toList();
-    }
-
     public Long getPlayerBidding(UUID id){
         return bidHistory.getOrDefault(id, 0L);
     }
 
-    public CompoundTag save(){
+    public CompoundTag save(MinecraftServer server){
         CompoundTag tag = new CompoundTag();
 
         tag.put("Id", StringTag.valueOf(id.toString()));
@@ -141,13 +131,13 @@ public class ItemBidding {
             historyList.add(entryTag);
         }
         tag.put("BidHistory", historyList);
-        tag.put("HighestBidder", StringTag.valueOf(highestBidder.toString()));
+        tag.put("HighestBidder", StringTag.valueOf(highestBidder != null ? highestBidder.toString() : ""));
         tag.put("CurrentBid", LongTag.valueOf(currentBid));
         tag.put("Item", ItemStack.CODEC
-                .encodeStart(NbtOps.INSTANCE, item)
+                .encodeStart(server.registryAccess().createSerializationContext(NbtOps.INSTANCE), item)
                 .getOrThrow());
-        tag.put("Cancelled", ByteTag.valueOf(cancelled));
         tag.put("Active", ByteTag.valueOf(active));
+        tag.put("Finalized", ByteTag.valueOf(finalized));
 
         return tag;
     }
@@ -158,7 +148,6 @@ public class ItemBidding {
     public UUID highestBidder() { return highestBidder; }
     public long currentBid() { return currentBid; }
     public ItemStack item() { return item; }
-    public boolean cancelled() { return cancelled; }
     public long endTimestamp() { return endTimestamp; }
 
     public static final StreamCodec<RegistryFriendlyByteBuf, ItemBidding> STREAM_CODEC = StreamCodec.of(
@@ -183,13 +172,10 @@ public class ItemBidding {
                 // 5. Item Stack
                 ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, bidding.item());
 
-                // 6. Cancelled
-                ByteBufCodecs.BOOL.encode(buf, bidding.cancelled());
-
-                // 7. Active
+                // 6. Active
                 ByteBufCodecs.BOOL.encode(buf, bidding.isActive());
 
-                // 8. End Timestamp
+                // 7. End Timestamp
                 ByteBufCodecs.VAR_LONG.encode(buf, bidding.endTimestamp());
             },
 
@@ -211,7 +197,7 @@ public class ItemBidding {
 
                 long currentBid = ByteBufCodecs.VAR_LONG.decode(buf);
                 ItemStack item = ItemStack.OPTIONAL_STREAM_CODEC.decode(buf);
-                boolean cancelled = ByteBufCodecs.BOOL.decode(buf);
+
                 boolean active = ByteBufCodecs.BOOL.decode(buf);
                 long endTimestamp = ByteBufCodecs.VAR_LONG.decode(buf);
 
@@ -221,7 +207,6 @@ public class ItemBidding {
                         highestBidder,
                         currentBid,
                         item,
-                        cancelled,
                         active,
                         endTimestamp
                 );

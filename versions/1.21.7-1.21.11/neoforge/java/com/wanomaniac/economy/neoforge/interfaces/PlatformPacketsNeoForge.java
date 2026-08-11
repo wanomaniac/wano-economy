@@ -15,8 +15,6 @@ import java.util.function.Consumer;
 
 import static com.wanomaniac.economy.neoforge.EconomyNeoForge.registrar;
 
-
-
 public class PlatformPacketsNeoForge implements IPlatformPackets {
     // We'll need to put the handlers when the register is playing to the server in the moment.
     // So it needs to be stored somewhere!!!

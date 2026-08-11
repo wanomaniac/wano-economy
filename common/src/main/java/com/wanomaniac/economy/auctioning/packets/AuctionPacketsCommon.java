@@ -12,6 +12,14 @@ public class AuctionPacketsCommon {
         );
         // Client -> Server
         CommonEconomy.packets.registerC2SPayload(
+                OpenHistoryMenuC2SPacket.TYPE,
+                OpenHistoryMenuC2SPacket.CODEC
+        );
+        CommonEconomy.packets.registerC2SPayload(
+                SynchronizeAuctioneerAuctionC2SPacket.TYPE,
+                SynchronizeAuctioneerAuctionC2SPacket.CODEC
+        );
+        CommonEconomy.packets.registerC2SPayload(
                 StartBiddingItemC2SPacket.TYPE,
                 StartBiddingItemC2SPacket.CODEC
         );
@@ -31,6 +39,10 @@ public class AuctionPacketsCommon {
         CommonEconomy.packets.registerS2CPayload(
                 InitalizeBidderScreenS2CPacket.TYPE,
                 InitalizeBidderScreenS2CPacket.CODEC
+        );
+        CommonEconomy.packets.registerS2CPayload(
+                InitalizeSnapshotScreenS2CPacket.TYPE,
+                InitalizeSnapshotScreenS2CPacket.CODEC
         );
         CommonEconomy.packets.registerS2CPayload(
                 BidderJoinS2CPacket.TYPE,

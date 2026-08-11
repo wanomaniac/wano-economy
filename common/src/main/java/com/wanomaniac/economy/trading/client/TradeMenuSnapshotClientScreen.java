@@ -52,6 +52,16 @@ public class TradeMenuSnapshotClientScreen extends AbstractInputContainerScreen<
     }
 
     @Override
+    public boolean whenMouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        return false;
+    }
+
+    @Override
+    public boolean whenMouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+        return false;
+    }
+
+    @Override
     public boolean whenCharTyped(CharacterEvent event) {
         return true;
     }

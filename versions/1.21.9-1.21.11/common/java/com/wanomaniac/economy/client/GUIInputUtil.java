@@ -1,7 +1,10 @@
 package com.wanomaniac.economy.client;
 
+import com.wanomaniac.economy.client.input.CharacterEvent;
+import com.wanomaniac.economy.client.input.CursorTypes;
 import com.wanomaniac.economy.client.input.KeyEvent;
 import com.wanomaniac.economy.client.input.MouseButtonEvent;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.input.MouseButtonInfo;
@@ -15,7 +18,24 @@ public class GUIInputUtil {
         return editBox.keyPressed(new net.minecraft.client.input.KeyEvent(event.key(), event.scancode(), event.modifiers()));
     }
 
+    public static boolean onEditBoxCharTyped(EditBox editBox, CharacterEvent event){
+        return editBox.charTyped(new net.minecraft.client.input.CharacterEvent(event.codepoint(), event.modifiers()));
+    }
+
     public static boolean onButtonMouseClicked(Button button, MouseButtonEvent event, boolean isDoubleClick){
         return button.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(event.x(), event.y(), new MouseButtonInfo(event.buttonInfo().button(), event.buttonInfo().modifiers())), isDoubleClick);
+    }
+
+    private static com.mojang.blaze3d.platform.cursor.CursorType mapToMojangCursorTypes(CursorTypes types){
+        if(types == CursorTypes.ARROW) return com.mojang.blaze3d.platform.cursor.CursorTypes.ARROW;
+        if(types == CursorTypes.POINTING_HAND) return com.mojang.blaze3d.platform.cursor.CursorTypes.POINTING_HAND;
+
+        return com.mojang.blaze3d.platform.cursor.CursorTypes.ARROW;
+    }
+
+    public static void changeCursor(GuiGraphics graphics, CursorTypes cursorTypes) {
+        if(graphics == null) return;
+
+        graphics.requestCursor(mapToMojangCursorTypes(CursorTypes.ARROW));
     }
 }

@@ -179,7 +179,9 @@ public class TradeManager {
 
         if (!rootTag.contains("Trades")) return;
 
-        ListTag list = NbtUtil.LoadHistoryTag(rootTag);
+        Optional<ListTag> listObj = NbtUtil.getListFromCompound(rootTag, "Trades");
+        if(listObj.isEmpty()) return;
+        ListTag list = listObj.get();
         for (int i = 0; i < list.size(); i++) {
             TradeData data = TradeData.load(NbtUtil.GetCompoundTag(list, i));
             snapshotSession(data); // Builds O(1) indices automatically!

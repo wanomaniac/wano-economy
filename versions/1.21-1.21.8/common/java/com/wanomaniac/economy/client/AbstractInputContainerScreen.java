@@ -41,6 +41,18 @@ public abstract class AbstractInputContainerScreen<T extends AbstractContainerMe
     }
 
     @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if(!whenMouseScrolled(mouseX, mouseY, scrollX, scrollY)) return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        else return true;
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if(!whenMouseDragged(new MouseButtonEvent(mouseX, mouseY, new MouseButtonInfo(button, 0)), dragX, dragY)) return super.mouseDragged(mouseX,  mouseY, button, dragX, dragY);
+        else return true;
+    }
+
+    @Override
     public boolean charTyped(char codePoint, int modifiers) {
         if(!whenCharTyped(new CharacterEvent(codePoint, modifiers))) return super.charTyped(codePoint, modifiers);
         else return true;

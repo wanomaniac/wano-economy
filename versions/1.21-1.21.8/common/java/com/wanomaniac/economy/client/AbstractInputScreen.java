@@ -36,6 +36,18 @@ public abstract class AbstractInputScreen extends Screen implements InputScreenI
     }
 
     @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if(!whenMouseScrolled(mouseX, mouseY, scrollX, scrollY)) return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        else return true;
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if(!whenMouseDragged(new MouseButtonEvent(mouseX, mouseY, new MouseButtonInfo(button, 0)), dragX, dragY)) return super.mouseDragged(mouseX,  mouseY, button, dragX, dragY);
+        else return true;
+    }
+
+    @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         if(!whenMouseReleased(new MouseButtonEvent(mouseX, mouseY, new MouseButtonInfo(button, 0)))) return super.mouseReleased(mouseX, mouseY, button);
         else return true;

@@ -1,6 +1,8 @@
 package com.wanomaniac.economy.auctioning.types;
 
 import com.wanomaniac.economy.ClientEconomy;
+import com.wanomaniac.economy.auctioning.server.AuctionHistoryMenu;
+import com.wanomaniac.economy.auctioning.server.HistoryMenuDetails;
 import com.wanomaniac.economy.trading.server.TradeData;
 import com.wanomaniac.economy.trading.types.TradeGuiData;
 import com.wanomaniac.economy.trading.types.TradeInventoryType;

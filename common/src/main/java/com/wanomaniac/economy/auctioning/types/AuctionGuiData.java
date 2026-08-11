@@ -11,11 +11,13 @@ import java.util.UUID;
 
 public record AuctionGuiData(
         UUID auctionId,
-        UUID auctioneer
+        UUID auctioneer,
+        boolean isNew
 ) {
     public static final StreamCodec<RegistryFriendlyByteBuf, AuctionGuiData> STREAM_CODEC = StreamCodec.composite(
             UUIDUtil.STREAM_CODEC, AuctionGuiData::auctionId,
             UUIDUtil.STREAM_CODEC, AuctionGuiData::auctioneer,
+            ByteBufCodecs.BOOL, AuctionGuiData::isNew,
             AuctionGuiData::new
     );
 }

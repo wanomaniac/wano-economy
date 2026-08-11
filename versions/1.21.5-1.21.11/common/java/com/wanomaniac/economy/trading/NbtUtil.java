@@ -10,10 +10,6 @@ import java.util.Set;
 
 // Keys got a overhaul between 1.21 - 1.21.9 so we need to generalise it!
 public class NbtUtil {
-    public static ListTag LoadHistoryTag(CompoundTag rootTag){
-        return rootTag.getList("Trades").get();
-    }
-
     public static CompoundTag GetCompoundTag(ListTag listTag, int iteration){
         return listTag.getCompound(iteration).get();
     }
@@ -42,12 +38,16 @@ public class NbtUtil {
         return compoundTag.getCompound(key);
     }
 
+    public static Optional<CompoundTag> getCompoundFromList(ListTag listTag, int index){
+        return listTag.getCompound(index);
+    }
+
     public static Set<String> getKeySetFromCompound(CompoundTag compoundTag){
         return compoundTag.keySet();
     }
 
     public static boolean getCompoundBooleanOr(CompoundTag compoundTag, String key, boolean def){
-        return compoundTag.getBoolean(key).get()|| def;
+        return compoundTag.getBoolean(key).isPresent() ? compoundTag.getBoolean(key).get() : def;
     }
 
     public static String getCompoundStringOr(CompoundTag compoundTag, String key, String def){

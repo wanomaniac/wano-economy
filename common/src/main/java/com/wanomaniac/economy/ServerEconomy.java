@@ -20,6 +20,8 @@ public class ServerEconomy {
         AuctionPacketsServer.register();
         TradePacketsServer.register();
         eventRegistry.whenPlayerJoins(CommonEconomy::onPlayerJoin);
+        eventRegistry.whenPlayerJoins((ServerPlayer) -> AUCTION_MANAGER.onPlayerJoin(ServerPlayer));
+
         eventRegistry.whenLivingEntityAfterDeath((entity, damageSource) -> {
             if (!(entity instanceof ServerPlayer victim)) return;
 
@@ -41,7 +43,6 @@ public class ServerEconomy {
         eventRegistry.onServerStopping(server -> AUCTION_MANAGER.saveHistory());
         eventRegistry.onCommandRegistrationCallback(TradeCommandRegister::registerCommands);
         eventRegistry.onCommandRegistrationCallback(AuctionCommandRegister::registerCommands);
-
         eventRegistry.whenServerTicks((server) -> AUCTION_MANAGER.tickAllSessions());
 
 
